@@ -1,0 +1,1211 @@
+                                                                PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+
+                                PRODUCT REQUIREMENTS DOCUMENT
+
+
+                      Digital Work Instruction
+                      & Production Tracking
+                            Aplikasi Produksi Lokal Berbasis LAN
+
+
+Client                                                        CV AUTOMOVA DETAILING INDONESIA
+
+Lokasi                                                        Kabupaten Pasuruan, Jawa Timur
+
+Prepared by                                                   Dicky Rachmat Iskandar
+
+Dokumen                                                       PRD-DWI-AUTOMOVA-001
+
+Versi                                                         1.0 - Draft for Approval
+
+Tanggal                                                       22 Juli 2026
+
+
+
+Klasifikasi Dokumen Confidential. Dokumen ini digunakan sebagai acuan analisis, desain, development, UAT, dan serah
+terima aplikasi.
+
+
+
+
+                                 CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                      PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+Kontrol Dokumen
+Product Owner / Sponsor                                             Bapak Suganda - CV AUTOMOVA DETAILING INDONESIA
+
+Product / System Owner                                              CV AUTOMOVA DETAILING INDONESIA
+
+Business Analyst / Developer                                        Dicky Rachmat Iskandar
+
+Status                                                              Draft untuk konfirmasi dan approval
+
+Target platform                                                     Aplikasi web lokal pada jaringan LAN/Wi-Fi internal
+
+
+Riwayat Versi
+            Versi                                Tanggal                       Penyusun                           Perubahan
+
+                                                                                                       Dokumen awal PRD lengkap
+                                                                                                       berdasarkan diskusi kebutuhan,
+1.0                               22 Juli 2026                      Dicky Rachmat Iskandar
+                                                                                                       proposal, quotation, dan prototype
+                                                                                                       operator/admin.
+
+
+Daftar Isi
+• 1. Ringkasan Produk
+• 2. Latar Belakang dan Permasalahan
+• 3. Tujuan, Sasaran, dan Indikator Keberhasilan
+• 4. Stakeholder dan Peran Pengguna
+• 5. Ruang Lingkup
+• 6. Alur Bisnis Utama
+• 7. Status dan Aturan Bisnis
+• 8. Kebutuhan Fungsional
+• 9. Kebutuhan Report dan Export
+• 10. Kebutuhan UI/UX Responsive
+• 11. Arsitektur dan Teknologi
+• 12. Model Data Tingkat Tinggi
+• 13. Kebutuhan Non-Fungsional
+• 14. Keamanan, Audit, Backup, dan Recovery
+• 15. Kriteria Penerimaan dan UAT
+• 16. Tahapan Delivery
+• 17. Risiko dan Mitigasi
+• 18. Out of Scope dan Roadmap
+• 19. Glosarium
+• 20. Approval
+
+
+
+
+                                       CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                        PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+1. Ringkasan Produk
+Digital Work Instruction & Production Tracking adalah aplikasi produksi lokal yang memandu operator menjalankan Job secara
+berurutan melalui tablet atau PC. Sistem menampilkan instruksi, bahan, timer, alarm, keputusan YES/NO, catatan operator,
+dan progress produksi. Admin mengelola Job, step, bahan, versi SOP, operator, batch, histori, serta report melalui dashboard
+di jaringan internal perusahaan.
+
+ Prinsip Deployment Aplikasi tidak ditempatkan di VPS atau cloud. Satu komputer/mini-PC di lokasi produksi berfungsi
+ sebagai local server. Tablet dan PC mengakses aplikasi melalui browser pada LAN/Wi-Fi yang sama.
+
+
+2. Latar Belakang dan Permasalahan
+ • Instruksi kerja produksi masih berpotensi disampaikan melalui dokumen statis, pesan, atau arahan manual sehingga versi
+    SOP yang digunakan dapat tidak konsisten.
+ • Operator membutuhkan panduan step-by-step dengan timer dan alarm agar durasi proses lebih terkontrol.
+ • Riwayat siapa yang memproduksi, kapan dilakukan, bahan yang dipakai, jumlah hasil, dan penyimpangan belum tercatat
+   dalam satu sistem terstruktur.
+ • Perubahan Job harus dapat dikelola admin dan otomatis tersedia pada perangkat operator tanpa instal ulang.
+ • Manajemen membutuhkan laporan lengkap yang dapat difilter dan diunduh dalam format Excel, CSV, PDF, serta dicetak.
+
+3. Tujuan, Sasaran, dan Indikator Keberhasilan
+                    ID                                          Tujuan                                    Indikator Keberhasilan
+
+                                                                                              Seluruh Job aktif tersedia dalam sistem dengan
+OBJ-01                                     Mendigitalisasi instruksi kerja produksi
+                                                                                              versi yang dapat dilacak.
+
+                                                                                              Operator hanya dapat melanjutkan setelah
+OBJ-02                                     Menjaga urutan dan waktu proses
+                                                                                              aksi/konfirmasi sesuai aturan Job.
+
+                                                                                              Setiap batch memiliki operator, Job version,
+OBJ-03                                     Meningkatkan traceability
+                                                                                              bahan, waktu, step log, dan catatan.
+
+                                                                                              Admin melihat Job aktif, paused, selesai,
+OBJ-04                                     Mempermudah monitoring
+                                                                                              kendala, dan output harian dari dashboard.
+
+                                                                                              Report dapat difilter dan diekspor ke XLSX,
+OBJ-05                                     Mempermudah pelaporan
+                                                                                              CSV, PDF, serta print.
+
+                                                                                              Fungsi utama dapat digunakan tanpa internet
+OBJ-06                                     Menjaga operasi lokal
+                                                                                              selama local server dan jaringan internal aktif.
+
+
+4. Stakeholder dan Peran Pengguna
+                             Peran                                                          Tanggung Jawab Utama
+
+                                                                       Mengelola user, Job, versi, bahan, pengaturan, dashboard, laporan,
+Admin
+                                                                       backup, dan audit.
+
+                                                                       Memantau proses, pause/resume, repeat/skip step dengan otorisasi,
+Supervisor
+                                                                       membatalkan batch, dan memberi catatan.
+
+                                                                       Memilih Job, menjalankan step, timer, mengisi catatan, memilih
+Operator
+                                                                       YES/NO, dan menyelesaikan batch.
+
+Manajemen                                                              Melihat dashboard dan laporan produksi sesuai hak akses.
+
+                                                                       Melakukan instalasi, backup, recovery, update aplikasi, dan
+System Maintainer
+                                                                       pemeliharaan teknis.
+
+
+5. Ruang Lingkup
+In Scope - Phase 1 / MVP
+ • Local server pada Windows PC/mini-PC dan akses melalui LAN/Wi-Fi internal.
+ • Login, role-based access, master user, dan pengelolaan operator.
+ • Master Job, material, step/substep, timer, warning, action button, branching YES/NO, draft, publish, archive, dan versioning.
+ • Operator application responsive untuk tablet Android dan desktop browser.
+ • Nomor batch otomatis, progress, pause/resume, notes, supervisor override, dan completion.
+
+
+                                     CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                     PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+ • History batch, step log, material usage, audit trail, dashboard monitoring, report, export, backup, dan restore dasar.
+
+Out of Scope - Phase 1
+ • ERP, accounting, purchasing, inventory valuation, dan payroll.
+ • Integrasi otomatis dengan mesin, PLC, sensor, flow meter, atau timbangan digital.
+ • Aplikasi native Android/iOS dan publikasi ke Play Store/App Store.
+ • VPS, cloud hosting, multi-site replication, dan remote access dari internet.
+ • WhatsApp/Telegram notification, QR/barcode scanner, tanda tangan digital, dan approval QC berlapis kecuali melalui
+   Change Request.
+
+6. Referensi Tampilan dan Konsep Interaksi
+Mockup berikut menjadi referensi arah UI. Detail final dapat berubah saat tahap desain tanpa mengubah requirement inti.
+
+
+
+
+                                      CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+
+     Gambar 1. Operator - pemilihan Job dan Start Job
+
+
+
+
+CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                      PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+
+Gambar 2. Operator - active step, timer, catatan, dan keputusan YES/NO
+
+
+
+
+    CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                       PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+
+           Gambar 3. Admin - dashboard monitoring produksi
+
+
+
+
+Gambar 4. Admin - Job Editor, material, step builder, dan publish version
+
+
+
+
+    CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                    PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+7. Alur Bisnis Utama
+7.1 Admin Membuat dan Mempublikasikan Job
+Admin membuat Job Draft -> menentukan produk, target, unit, area, bahan, step, timer, action, warning, dan branching ->
+validasi -> Publish -> sistem membuat Job Version baru -> perangkat operator melihat versi terbaru untuk batch baru.
+
+7.2 Operator Menjalankan Produksi
+Operator login -> memilih Job -> review ringkasan -> Start Job -> sistem membuat Batch No -> Step 1 aktif dan timer berjalan
+-> operator menekan action -> konfirmasi YES/NO -> proses berlanjut sampai selesai.
+
+7.3 Kondisi NO / Kendala
+Operator mengisi catatan -> memilih NO -> batch berstatus Paused -> timer pengingat berjalan -> supervisor/operator yang
+berwenang melakukan resume -> log pause, alasan, dan durasi tersimpan.
+
+7.4 Perubahan Job Saat Batch Aktif
+Admin publish versi baru -> batch yang sedang aktif tetap menggunakan snapshot versi lama -> versi baru hanya digunakan
+ketika batch berikutnya dimulai.
+
+7.5 Penyelesaian dan Pelaporan
+Step terakhir selesai -> operator konfirmasi final -> batch berstatus Completed -> waktu selesai dan output dicatat -> data
+muncul pada dashboard, history, dan report.
+
+8. Status dan Aturan Bisnis
+                  Entitas                                      Status                                         Definisi
+
+                                                                                         Masih dapat diedit dan belum tersedia untuk
+ Job                                        Draft
+                                                                                         operator.
+
+ Job                                        Published                                    Aktif dan dapat digunakan untuk batch baru.
+
+                                                                                         Tidak dapat dipilih operator; histori tetap
+ Job                                        Archived
+                                                                                         tersedia.
+
+ Batch                                      Ready                                        Batch telah dibuat, belum memulai step.
+
+ Batch                                      In Progress                                  Minimal satu step sedang berjalan.
+
+                                                                                         Proses berhenti sementara karena NO, kendala,
+ Batch                                      Paused
+                                                                                         atau supervisor.
+
+                                                                                         Semua step selesai dan output telah
+ Batch                                      Completed
+                                                                                         dikonfirmasi.
+
+                                                                                         Dibatalkan oleh supervisor/admin dengan
+ Batch                                      Cancelled
+                                                                                         alasan wajib.
+
+                                                                                         Belum dapat dibuka karena step sebelumnya
+ Step                                       Locked
+                                                                                         belum selesai.
+
+ Step                                       Running                                      Timer/aktivitas step sedang berjalan.
+
+                                                                                         Timer atau action selesai dan menunggu
+ Step                                       Waiting Confirmation
+                                                                                         YES/NO.
+
+ Step                                       Completed                                    Step selesai dan data tersimpan.
+
+                                                                                         Dilewati dengan supervisor override dan alasan
+ Step                                       Skipped
+                                                                                         wajib.
+
+
+Aturan Bisnis Kritis
+ • BR-01: Nomor batch harus unik dan dibuat otomatis saat operator menekan Start Job.
+ • BR-02: Setiap batch menyimpan Job Version snapshot sehingga perubahan master tidak mengubah batch aktif.
+ • BR-03: Step berikutnya tetap terkunci sampai action dan confirmation pada step aktif terpenuhi.
+ • BR-04: Pemilihan NO wajib disertai catatan operator.
+ • BR-05: Skip, repeat, cancel, dan override membutuhkan otorisasi supervisor serta alasan.
+ • BR-06: Timer menggunakan waktu server sebagai sumber utama agar tidak bergantung pada perubahan jam perangkat
+   tablet.
+ • BR-07: Menutup browser tidak menghilangkan batch aktif; saat login kembali sistem menampilkan proses terakhir.
+
+
+                                     CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                        PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+• BR-08: Penghapusan Job yang telah dipakai tidak diperbolehkan secara permanen; sistem menggunakan archive/soft
+  delete.
+• BR-09: Report hanya menampilkan data sesuai role dan filter yang diizinkan.
+• BR-10: Pengubahan data transaksi yang sudah Completed harus dicatat pada audit log dan dibatasi untuk admin.
+
+9. Kebutuhan Fungsional
+9.1 Authentication dan User Management
+             ID                           Requirement                           Priority                   Acceptance Criteria
+
+                               Sistem menyediakan login                                            User valid dapat masuk; user tidak
+           FR-001              menggunakan username dan                           Must             valid menerima pesan error tanpa
+                               password.                                                           membocorkan detail akun.
+
+                               Sistem menyediakan role Admin,
+                                                                                                   Menu dan aksi yang tampil mengikuti
+           FR-002              Supervisor, Operator, dan                          Must
+                                                                                                   hak akses role.
+                               Viewer/Management.
+
+                               Admin dapat membuat, mengubah,                                      Perubahan user tersimpan dan
+           FR-003              menonaktifkan, dan reset password                  Must             langsung berlaku pada login
+                               user.                                                               berikutnya.
+
+                               Sistem mencatat login, logout,
+                                                                                                   Audit log menampilkan user, waktu,
+           FR-004              gagal login, dan aktivitas penting                Should
+                                                                                                   perangkat/IP lokal, dan aktivitas.
+                               user.
+
+                               Session otomatis berakhir setelah
+                                                                                                   User diminta login ulang setelah
+           FR-005              periode idle yang dapat                           Should
+                                                                                                   timeout.
+                               dikonfigurasi.
+
+
+
+9.2 Master Job dan Versioning
+             ID                           Requirement                           Priority                   Acceptance Criteria
+
+                                                                                                   Job tersimpan dengan nama, kode,
+                               Admin dapat membuat Job baru
+           FR-010                                                                 Must             produk, target, unit, area, line, shift,
+                               dalam status Draft.
+                                                                                                   dan status.
+
+                               Admin dapat edit, duplicate,                                        Perubahan draft tersimpan; archived
+           FR-011                                                                 Must
+                               archive, dan search/filter Job.                                     Job tidak muncul pada operator.
+
+                               Admin dapat publish Job dan                                         Published version memiliki nomor
+           FR-012                                                                 Must
+                               sistem membuat nomor versi baru.                                    versi, publisher, dan timestamp.
+
+                               Sistem mempertahankan seluruh                                       Admin dapat melihat daftar versi dan
+           FR-013                                                                 Must
+                               riwayat versi Job.                                                  ringkasan perubahan.
+
+                               Batch aktif menggunakan snapshot                                    Publish baru tidak mengubah
+           FR-014                                                                 Must
+                               Job Version saat Start Job.                                         step/material/timer batch aktif.
+
+
+
+
+9.3 Material dan Step Builder
+             ID                           Requirement                           Priority                   Acceptance Criteria
+
+                               Admin dapat menambahkan
+                                                                                                   Material tersimpan berurutan dan
+           FR-020              material, jumlah, dan satuan pada                  Must
+                                                                                                   dapat diedit sebelum publish.
+                               Job.
+
+                               Satuan mendukung Kg, Gram,                                          Unit tampil konsisten pada operator,
+           FR-021                                                                 Must
+                               Liter, Ml, Unit, dan custom unit.                                   history, dan report.
+
+                               Admin dapat menambah,
+                                                                                                   Urutan dapat disimpan dan tampil
+           FR-022              mengubah, menghapus, dan                           Must
+                                                                                                   sama di operator.
+                               mengurutkan step/substep.
+
+                               Setiap step memiliki judul, instruksi,
+                                                                                                   Seluruh atribut tampil pada active job
+           FR-023              warning, timer, action label, dan                  Must
+                                                                                                   screen.
+                               notes rule.
+
+                               Step mendukung branching YES ke
+                                                                                                   Flow mengikuti rule yang
+           FR-024              step tujuan dan NO ke Paused/step                  Must
+                                                                                                   dikonfigurasi.
+                               tertentu.
+
+                               Admin dapat menentukan catatan                                      Sistem mencegah lanjut ketika
+           FR-025                                                                Should
+                               wajib atau opsional per step.                                       catatan wajib belum diisi.
+
+
+
+                                    CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                          PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+          ID                    Requirement                         Priority                  Acceptance Criteria
+
+                     Admin dapat menambahkan                                          Gambar tampil responsive tanpa
+        FR-026                                                       Could
+                     gambar instruksi pada step.                                      mengganggu timer/action.
+
+
+
+
+9.4 Operator Job Execution
+          ID                    Requirement                         Priority                  Acceptance Criteria
+
+                                                                                      Daftar menampilkan nama, produk,
+                     Operator melihat daftar Published
+        FR-030                                                       Must             target, jumlah step, versi, dan update
+                     Job yang aktif.
+                                                                                      terakhir.
+
+                     Operator dapat membuka detail                                    Sistem membuat batch unik dan
+        FR-031                                                       Must
+                     dan menekan Start Job.                                           mencatat operator/waktu mulai.
+
+                     Operator hanya melihat satu active
+                                                                                      Step lain berstatus locked/preview
+        FR-032       step utama dengan instruksi yang                Must
+                                                                                      sesuai konfigurasi.
+                     jelas.
+
+                     Sistem menampilkan progress step                                 Progress berubah setelah step
+        FR-033                                                       Must
+                     dan status batch.                                                completed.
+
+                     State batch dapat dipulihkan
+                                                                                      Login ulang membuka active batch
+        FR-034       setelah browser ditutup atau                    Must
+                                                                                      pada state terakhir.
+                     perangkat reconnect.
+
+                     Operator dapat mengisi hasil                                     Nilai dan unit output tersimpan pada
+        FR-035                                                       Must
+                     produksi aktual pada akhir Job.                                  batch.
+
+
+
+
+9.5 Timer, Alarm, dan Confirmation
+          ID                    Requirement                         Priority                  Acceptance Criteria
+
+                     Timer countdown berjalan                                         Sisa waktu diperbarui per detik dan
+        FR-040                                                       Must
+                     berdasarkan konfigurasi step.                                    tidak reset saat refresh.
+
+                     Sistem membunyikan alarm                                         Alarm muncul minimal sekali dan
+        FR-041                                                       Must
+                     visual/audio saat timer selesai.                                 dapat diakui operator.
+
+                     Action button dapat memulai                                      Klik action tercatat dengan timestamp
+        FR-042                                                       Must
+                     substep/timer berikutnya.                                        dan mengaktifkan rule terkait.
+
+                                                                                      YES mengikuti branching; NO
+                     Setelah aktivitas selesai sistem
+        FR-043                                                       Must             membutuhkan catatan dan melakukan
+                     meminta YES/NO.
+                                                                                      pause.
+
+                     Paused Job menjalankan reminder                                  Pengingat tampil/bunyi sesuai interval
+        FR-044                                                      Should
+                     timer berulang.                                                  konfigurasi.
+
+                     Supervisor dapat repeat, skip,
+                                                                                      Aksi membutuhkan alasan dan
+        FR-045       resume, atau cancel dengan                      Must
+                                                                                      tercatat pada audit.
+                     PIN/password.
+
+
+
+9.6 Batch, History, dan Audit
+          ID                    Requirement                         Priority                  Acceptance Criteria
+
+                     Sistem menghasilkan nomor batch
+        FR-050       otomatis dengan format                          Must             Tidak ada duplikasi nomor batch.
+                     configurable.
+
+                     Sistem menyimpan waktu
+                                                                                      Durasi dapat dilihat pada detail batch
+        FR-051       mulai/selesai dan durasi per step               Must
+                                                                                      dan report.
+                     serta total.
+
+                     Sistem menyimpan material plan                                   Report dapat membandingkan
+        FR-052                                                      Should
+                     dan material actual per batch.                                   planned vs actual.
+
+                     History dapat dicari berdasarkan
+                                                                                      Filter mengembalikan hasil sesuai
+        FR-053       batch, Job, produk, operator,                   Must
+                                                                                      parameter.
+                     tanggal, dan status.
+
+                     Detail batch menampilkan timeline                                Timeline memuat step, action, pause,
+        FR-054                                                       Must
+                     seluruh aktivitas.                                               notes, override, dan completion.
+
+        FR-055       Audit log tidak dapat diedit oleh               Must             Operator hanya dapat melihat data
+
+
+
+                          CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                        PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+         ID                    Requirement                        Priority                  Acceptance Criteria
+
+                                                                                    yang diizinkan; admin dapat
+                   operator.
+                                                                                    melakukan review.
+
+
+
+9.7 Dashboard dan Settings
+         ID                    Requirement                        Priority                  Acceptance Criteria
+
+                   Dashboard menampilkan produksi
+                                                                                    KPI mengikuti filter tanggal/area jika
+       FR-060      hari ini, active Job, completed                 Must
+                                                                                    tersedia.
+                   batch, dan paused Job.
+
+                   Dashboard menampilkan grafik                                     Grafik dapat difilter per periode dan
+       FR-061                                                     Should
+                   produksi dan daftar batch terbaru.                               produk.
+
+                   Dashboard menampilkan kendala
+                                                                                    Paused/warning terbaru tampil
+       FR-062      produksi dan perubahan Job                     Should
+                                                                                    dengan waktu dan operator.
+                   terbaru.
+
+                   Admin dapat mengatur format
+                                                                                    Perubahan setting tersimpan dan
+       FR-063      batch, interval reminder, default               Must
+                                                                                    digunakan transaksi berikutnya.
+                   unit, dan identitas perusahaan.
+
+                   Admin dapat melakukan backup
+                                                                                    File backup dapat dibuat dan
+       FR-064      manual dan melihat status backup                Must
+                                                                                    diunduh/disalin ke media lokal.
+                   terakhir.
+
+
+
+
+                        CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                             PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+10. Kebutuhan Report dan Export
+Modul report harus menyediakan filter, tampilan tabel, ringkasan KPI, detail transaksi, dan export. Semua report harus dapat
+digunakan pada jaringan lokal tanpa layanan cloud.
+                ID                                 Nama Report                          Filter Utama                            Isi Utama
+
+                                                                                                                  Total batch, total hasil, average
+ RPT-01                             Ringkasan Produksi                     Tanggal/periode, produk, Job, status
+                                                                                                                  duration, completed/paused/cancelled
+
+                                                                                                                  Versi Job, start/end, output, material,
+ RPT-02                             Detail Batch                           Batch No, Job, produk, operator
+                                                                                                                  timeline step, notes, override
+
+                                                                                                                  Jumlah batch, output, durasi rata-rata,
+ RPT-03                             Produktivitas Operator                 Periode, operator, shift
+                                                                                                                  pause, completion rate
+
+                                                                                                                  Jumlah batch, avg total duration, avg
+ RPT-04                             Kinerja Job                            Periode, Job, version
+                                                                                                                  step duration, delay frequency
+
+                                                                                                                  Planned duration, actual duration,
+ RPT-05                             Durasi Step & Keterlambatan            Periode, Job, step
+                                                                                                                  variance, late count
+
+                                                                                                                  NO reason, pause duration, warning,
+ RPT-06                             Kendala dan Penyimpangan               Periode, status, operator, Job
+                                                                                                                  supervisor action, resolution
+
+                                                                                                                  Planned qty, actual qty, variance, total
+ RPT-07                             Penggunaan Material                    Periode, material, Job, batch
+                                                                                                                  penggunaan per unit
+
+                                                                                                                  Produk, operator, Job version,
+ RPT-08                             Traceability Batch                     Batch No
+                                                                                                                  material, semua timestamps, output
+
+                                                                                                                  Perubahan, tanggal publish, status,
+ RPT-09                             History Versi Job                      Job, version, publisher
+                                                                                                                  jumlah batch pengguna versi
+
+                                                                                                                  Login, master changes, publish,
+ RPT-10                             Audit Aktivitas                        Periode, user, action
+                                                                                                                  override, edit transaction, backup
+
+
+Format Download dan Aturan Export
+                ID                                Requirement                             Priority                        Acceptance Criteria
+
+                                                                                                                  File dapat dibuka di Microsoft
+                                    Setiap report dapat diunduh                                                   Excel/LibreOffice dan memiliki
+             REP-001                                                                        Must
+                                    sebagai Excel Workbook (.xlsx).                                               header, tipe data, serta format
+                                                                                                                  tanggal/angka yang benar.
+
+                                                                                                                  Delimiter dan encoding menjaga
+                                    Report dapat diunduh sebagai CSV
+             REP-002                                                                        Must                  karakter Indonesia serta dapat dibuka
+                                    UTF-8.
+                                                                                                                  di Excel.
+
+                                    Report dapat diunduh sebagai PDF                                              PDF memiliki judul, periode, filter,
+             REP-003                                                                        Must
+                                    A4 portrait/landscape sesuai report.                                          nomor halaman, dan tidak terpotong.
+
+                                    Report menyediakan mode Print                                                 Layout print menyembunyikan menu
+             REP-004                                                                       Should
+                                    dari browser.                                                                 dan tombol yang tidak diperlukan.
+
+                                    Excel detail batch dapat memiliki
+                                                                                                                  Workbook memuat sheet sesuai data
+             REP-005                multi-sheet: Summary, Steps,                           Should
+                                                                                                                  dan nama sheet mudah dipahami.
+                                    Materials, Notes, Audit.
+
+                                    Nama file export mengikuti pola
+                                                                                                                  Nama file konsisten dan tidak
+             REP-006                ReportName_YYYYMMDD_HHMM                                Must
+                                                                                                                  menggunakan karakter ilegal.
+                                    .[ext].
+
+                                    Filter aktif dan waktu generate                                               Penerima file mengetahui konteks
+             REP-007                                                                        Must
+                                    dicantumkan pada export.                                                      data.
+
+                                    User dapat memilih kolom untuk                                                Kolom yang dipilih tercermin pada
+             REP-008                                                                       Could
+                                    report tabel tertentu.                                                        layar dan export.
+
+                                    Export data besar diproses tanpa                                              Sistem memberikan indikator proses
+             REP-009                                                                       Should
+                                    membuat UI hang.                                                              dan file berhasil dibuat.
+
+
+Ketentuan Excel
+ • Header diberi format tebal dan freeze pane pada baris header.
+ • Kolom tanggal menggunakan format tanggal/waktu, bukan teks mentah.
+ • Kolom jumlah dan durasi menggunakan tipe numerik agar dapat dihitung ulang.
+ • Auto-filter aktif pada tabel report.
+ • Total atau summary ditempatkan pada bagian atas atau sheet Summary.
+
+
+
+                                          CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                          PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+• File tidak mengandung macro dan dapat dibuka tanpa koneksi internet.
+
+11. Kebutuhan UI/UX Responsive
+ Framework UI Frontend menggunakan Bootstrap 5.x sebagai framework responsive utama, Bootstrap Icons untuk ikon,
+ komponen tabel responsive/DataTables-compatible, dan Chart.js untuk grafik. Seluruh library dikemas lokal agar aplikasi
+ tidak bergantung pada CDN atau internet.
+
+                  ID                          Requirement                         Priority                      Acceptance Criteria
+
+                                  Layout menggunakan responsive
+                                                                                                        Tidak ada horizontal scroll pada form
+                                  grid Bootstrap dan mendukung
+              UI-001                                                                Must                utama di viewport standar; tabel dapat
+                                  tablet portrait, tablet landscape,
+                                                                                                        responsive/scroll terkontrol.
+                                  desktop, serta laptop.
+
+                                  Ukuran tombol operator minimum
+                                                                                                        Operator dapat menggunakan layar
+              UI-002              44x44 px dan action utama dibuat                  Must
+                                                                                                        sentuh dengan nyaman.
+                                  besar.
+
+                                  Timer, instruksi, warning, dan
+                                                                                                        Informasi kritis terbaca dari jarak kerja
+              UI-003              progress memiliki hirarki visual                  Must
+                                                                                                        normal.
+                                  kuat.
+
+                                  Warna status konsisten: biru in-
+                                  progress, hijau completed, oranye                                     Status mudah dibedakan tanpa hanya
+              UI-004                                                                Must
+                                  paused/warning, merah                                                 mengandalkan teks.
+                                  error/cancelled.
+
+                                  Form admin menggunakan validasi
+                                                                                                        User memahami field error dan hasil
+              UI-005              inline, modal konfirmasi, dan toast               Must
+                                                                                                        action.
+                                  notification.
+
+                                  Tabel report mendukung search,
+                                                                                                        Report tetap dapat digunakan pada
+              UI-006              sort, pagination, column visibility,              Must
+                                                                                                        desktop dan tablet.
+                                  dan responsive details.
+
+                                  Mode fullscreen tersedia pada                                         Browser dapat digunakan seperti
+              UI-007                                                               Should
+                                  operator app.                                                         kiosk selama produksi.
+
+                                  Navigasi operator maksimal empat
+                                                                                                        Alur operator sederhana dan tidak
+              UI-008              menu utama: Home, Active Job,                    Should
+                                                                                                        membingungkan.
+                                  History, Account.
+
+                                  Admin dashboard memakai sidebar                                       Ruang layar dapat dioptimalkan pada
+              UI-009                                                               Should
+                                  collapsible.                                                          laptop/tablet landscape.
+
+                                  Loading, empty, error, offline/LAN
+                                                                                                        User menerima feedback yang jelas
+              UI-010              disconnected, dan permission                      Must
+                                                                                                        pada semua kondisi.
+                                  denied state tersedia.
+
+
+Breakpoint dan Target Device
+                       Kategori                                 Lebar Referensi                                Perilaku
+
+                                                                                             Konten satu kolom, action sticky/bottom,
+Tablet Portrait                                768-899 px
+                                                                                             table menjadi card/details.
+
+                                                                                             Dua kolom, sidebar admin collapsible, timer
+Tablet Landscape                               900-1199 px
+                                                                                             dan instruksi berdampingan.
+
+Desktop/Laptop                                 >=1200 px                                     Dashboard multi-column dan tabel penuh.
+
+                                                                                             Fungsi review/emergency; bukan target
+Mobile terbatas                                <768 px
+                                                                                             utama area produksi.
+
+Accessibility dan Usability
+• Kontras warna minimal memadai untuk teks normal dan status kritis.
+• Input memiliki label yang jelas, bukan hanya placeholder.
+• Tombol memiliki teks dan ikon; ikon tidak menjadi satu-satunya indikator.
+• Alur dapat digunakan dengan keyboard pada desktop.
+• Pesan alarm audio selalu disertai indikator visual.
+• Konfirmasi destructive action seperti Cancel, Archive, dan Edit Completed Batch harus eksplisit.
+
+
+
+
+                                       CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                    PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+12. Arsitektur dan Teknologi
+Topologi Deployment Lokal
+                          Komponen                                                             Rekomendasi
+
+                                                                  Windows PC/mini-PC di lokasi produksi, IP lokal statis, berjalan saat
+Local Server
+                                                                  jam operasional.
+
+                                                                  Apache atau Nginx melalui Laragon/XAMPP/Docker lokal sesuai
+Web Server
+                                                                  keputusan implementasi.
+
+Backend                                                           PHP dengan Laravel stable release pada awal proyek.
+
+                                                                  MariaDB/MySQL lokal untuk akses multi-user dan integritas
+Database
+                                                                  transaksi.
+
+                                                                  Blade/HTML5, Bootstrap 5.x, Bootstrap Icons, JavaScript, Chart.js,
+Frontend
+                                                                  tabel responsive.
+
+Excel Export                                                      PhpSpreadsheet atau library Laravel Excel yang kompatibel.
+
+PDF Export                                                        Dompdf/Snappy-compatible library yang dikemas lokal.
+
+Client                                                            Google Chrome/Microsoft Edge desktop dan Chrome Android tablet.
+
+Network                                                           LAN/Wi-Fi internal; tablet membuka URL IP/hostname local server.
+
+Prinsip Arsitektur
+• Server menjadi source of truth untuk timer, batch state, version snapshot, dan audit log.
+• Frontend responsive tetapi business rule kritis divalidasi kembali di backend.
+• Seluruh asset CSS/JS/font/library tersedia lokal dan tidak menggunakan CDN.
+• File upload dibatasi ukuran/tipe dan disimpan pada storage lokal terstruktur.
+• Export dibuat di server lokal dan dikirim ke browser sebagai download.
+• Backup database dan file storage dibuat terjadwal ke folder backup dan media eksternal/network share bila tersedia.
+
+Kebutuhan Jaringan Lokal
+• Local server menggunakan IP statis atau hostname lokal yang mudah diingat.
+• Wi-Fi produksi harus memiliki jangkauan memadai dan akses ke server.
+• Port aplikasi dibuka hanya pada jaringan internal.
+• Admin dapat mengakses dashboard dari PC pada jaringan yang sama.
+• Akses dari luar lokasi tidak termasuk; bila dibutuhkan dapat ditambahkan melalui VPN pada fase berikutnya.
+
+13. Model Data Tingkat Tinggi
+                            Entity                                                               Data Utama
+
+users                                                             Akun, role, status, credential, last login
+
+roles_permissions                                                 Hak akses per role
+
+jobs                                                              Identitas master Job dan status
+
+job_versions                                                      Snapshot versi, publisher, publish time
+
+job_steps                                                         Step/substep, urutan, timer, action, warning
+
+step_branches                                                     Rule YES/NO dan target state/step
+
+materials                                                         Master bahan dan default unit
+
+job_materials                                                     Material plan per Job version
+
+batches                                                           Batch No, Job version, operator, status, output, waktu
+
+batch_steps                                                       State dan timestamps per step
+
+batch_materials                                                   Planned dan actual material per batch
+
+operator_notes                                                    Catatan per step/batch
+
+batch_events                                                      Timeline action, pause, resume, alarm, override
+
+
+                                     CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                     PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+                         Entity                                                                   Data Utama
+
+audit_logs                                                         Perubahan master, transaksi, login, backup
+
+system_settings                                                    Format batch, reminder, company identity, export settings
+
+Data Integrity Job Version dan data transaksi batch tidak boleh bergantung pada master yang dapat berubah. Snapshot
+versi dan material plan disimpan agar histori tetap konsisten.
+
+
+14. Kebutuhan Non-Fungsional
+               ID                            Kategori                         Requirement                                 Priority
+
+                                                                   Halaman utama dan daftar normal
+                                                                   tampil <= 3 detik pada LAN; action
+NFR-001                      Performance                                                                   Must
+                                                                   operator menerima respons <= 1
+                                                                   detik pada kondisi normal.
+
+                                                                   Mendukung minimal 20 user aktif
+NFR-002                      Concurrency                           bersamaan pada satu local server        Should
+                                                                   yang memenuhi spesifikasi.
+
+                                                                   Timer tidak berubah signifikan
+                                                                   akibat refresh atau jam perangkat;
+NFR-003                      Timer Accuracy                                                                Must
+                                                                   deviasi target <= 2 detik per
+                                                                   aktivitas normal.
+
+                                                                   State batch disimpan setiap event
+NFR-004                      Reliability                           penting dan dapat dipulihkan            Must
+                                                                   setelah browser reconnect.
+
+                                                                   Aplikasi tersedia selama server,
+NFR-005                      Availability                                                                  Must
+                                                                   database, dan jaringan lokal aktif.
+
+                                                                   Mendukung Chrome/Edge versi
+                                                                   yang masih didukung pada saat
+NFR-006                      Compatibility                                                                 Must
+                                                                   implementasi dan Android tablet
+                                                                   modern.
+
+                                                                   Kode modular, migration database,
+NFR-007                      Maintainability                       configuration file, dan dokumentasi     Must
+                                                                   instalasi tersedia.
+
+                                                                   Master Job, batch, material, dan
+NFR-008                      Scalability                           report tidak dibatasi hard-code;        Should
+                                                                   pagination digunakan.
+
+                                                                   Antarmuka utama berbahasa
+NFR-009                      Localization                          Indonesia; format tanggal, angka,       Must
+                                                                   dan unit konsisten.
+
+                                                                   Error log, audit log, backup log, dan
+NFR-010                      Observability                                                                 Should
+                                                                   health/status sederhana tersedia.
+
+
+15. Keamanan, Audit, Backup, dan Recovery
+               ID                           Requirement                          Priority                           Acceptance Criteria
+
+                             Password disimpan dalam bentuk
+                                                                                                           Database tidak mengandung
+             SEC-001         hash yang aman; tidak disimpan                        Must
+                                                                                                           password terbaca.
+                             plain text.
+
+                             Semua form mutasi data dilindungi
+             SEC-002                                                               Must                    Request tidak sah ditolak.
+                             CSRF dan validasi server-side.
+
+                             Hak akses diperiksa pada menu                                                 Operator tidak dapat membuka fungsi
+             SEC-003                                                               Must
+                             dan endpoint/action backend.                                                  admin melalui URL langsung.
+
+                             Input dan file upload divalidasi
+                                                                                                           Tipe, ukuran, nama file, dan konten
+             SEC-004         untuk mencegah injection dan file                     Must
+                                                                                                           yang diizinkan dibatasi.
+                             berbahaya.
+
+                             Audit log mencatat perubahan kritis
+                                                                                                           Log memuat actor, waktu, action,
+             SEC-005         dan tidak dapat dihapus oleh                          Must
+                                                                                                           entity, dan perubahan ringkas.
+                             operator.
+
+                             Backup database otomatis minimal                                              File backup tercipta dan status
+             BKP-001                                                               Must
+                             harian.                                                                       keberhasilan tercatat.
+
+
+
+
+                                   CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                       PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+              ID                           Requirement                         Priority                       Acceptance Criteria
+
+                                Admin dapat membuat backup                                            Backup dapat dipicu dan file
+           BKP-002                                                               Must
+                                manual sebelum update aplikasi.                                       terverifikasi tersedia.
+
+                                Backup meliputi database,
+                                                                                                      Restore menghasilkan data dan file
+           BKP-003              uploaded instruction images, dan                 Must
+                                                                                                      yang konsisten.
+                                configuration yang diperlukan.
+
+                                Retensi backup default 30 harian
+                                                                                                      Backup lama dibersihkan sesuai
+           BKP-004              dan 12 bulanan atau sesuai                      Should
+                                                                                                      kebijakan.
+                                keputusan klien.
+
+                                Prosedur restore diuji minimal satu                                   Sample restore berhasil pada
+           BKP-005                                                               Must
+                                kali saat UAT/deployment.                                             environment test.
+
+
+Skenario Recovery
+• Browser/tablet tertutup: operator login kembali dan melanjutkan active batch pada step terakhir.
+• Wi-Fi terputus singkat: UI menampilkan disconnected state dan mencoba reconnect; action tidak boleh tersimpan ganda.
+• Local server restart: service aplikasi/database berjalan kembali dan batch state tetap tersimpan.
+• Database rusak/gagal update: maintainer melakukan restore dari backup tervalidasi.
+• Server PC rusak: aplikasi dipasang pada perangkat pengganti dan data direstore dari media backup eksternal.
+
+16. Kriteria Penerimaan dan UAT
+                     ID                                          Skenario                                Expected Result
+
+                                                                                          Admin, supervisor, operator memperoleh menu
+UAT-01                                      Login dan Role                                sesuai role; akses langsung yang tidak sah
+                                                                                          ditolak.
+
+                                                                                          Admin membuat Job lengkap, publish version,
+UAT-02                                      Create/Publish Job
+                                                                                          dan Job tampil pada operator.
+
+                                                                                          Publish perubahan saat batch aktif tidak
+UAT-03                                      Versioning                                    mengubah batch aktif; batch baru memakai
+                                                                                          versi terbaru.
+
+                                                                                          Operator menekan Start dan sistem membuat
+UAT-04                                      Start Batch
+                                                                                          nomor batch unik beserta waktu/operator.
+
+                                                                                          Timer berjalan, tahan refresh, alarm muncul
+UAT-05                                      Timer dan Alarm
+                                                                                          ketika selesai, dan event tercatat.
+
+                                                                                          YES membuka step target dan progress
+UAT-06                                      Branch YES
+                                                                                          berubah.
+
+                                                                                          NO tanpa note ditolak; NO dengan note
+UAT-07                                      Branch NO
+                                                                                          membuat Paused dan reminder aktif.
+
+                                                                                          PIN/password supervisor dapat
+UAT-08                                      Supervisor Override                           repeat/skip/resume/cancel dan log alasan
+                                                                                          tersimpan.
+
+                                                                                          Browser ditutup dan login kembali menampilkan
+UAT-09                                      Recovery
+                                                                                          active Job pada state terakhir.
+
+                                                                                          Final step menghasilkan Completed batch
+UAT-10                                      Completion                                    dengan output, waktu, notes, material, dan
+                                                                                          timeline.
+
+                                                                                          Filter report menghasilkan data sesuai
+UAT-11                                      Report Filter
+                                                                                          batch/Job/operator/periode/status.
+
+                                                                                          XLSX dapat dibuka, format data benar, filter
+UAT-12                                      Excel Export                                  tercantum, dan sheet detail tersedia sesuai
+                                                                                          report.
+
+                                                                                          File PDF tidak terpotong; CSV UTF-8 benar;
+UAT-13                                      PDF/CSV/Print
+                                                                                          print layout bersih.
+
+                                                                                          Operator screen dapat digunakan di tablet
+UAT-14                                      Responsive                                    portrait/landscape; admin dapat digunakan di
+                                                                                          laptop/desktop.
+
+                                                                                          Backup manual/otomatis tersedia dan sample
+UAT-15                                      Backup Restore
+                                                                                          restore berhasil.
+
+
+
+
+                                     CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                          PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+
+Definition of Done
+• Seluruh requirement Must telah dikembangkan dan lulus internal testing.
+• UAT kritis lulus dan temuan blocker/critical telah ditutup.
+• Deployment pada local server berhasil dan tablet dapat mengakses melalui LAN.
+• Data awal user serta minimal satu sample Job telah dikonfigurasi.
+• Dokumentasi admin, operator, backup, restore, dan instalasi diserahkan.
+• Training online/onsite sesuai quotation telah dilakukan.
+• Source code dan credential serah terima mengikuti kesepakatan kontrak/quotation.
+
+17. Tahapan Delivery
+                       Tahap                                         Target                                 Output Utama
+
+                                                                                           Finalisasi PRD, data sample, workflow, dan
+Kickoff & Analysis                             Minggu 1
+                                                                                           environment lokal.
+
+                                                                                           Responsive operator/admin prototype dan
+UI/UX & Prototype                              Minggu 1-2
+                                                                                           approval flow.
+
+                                                                                           Login, Job/material/step builder, publish/version,
+Phase 1 - Core System                          Selesai bulan pertama                       operator execution, timer, YES/NO, batch,
+                                                                                           history dasar.
+
+                                                                                           Dashboard, report lengkap,
+Phase 2 - Reporting & Hardening                Minggu 5-7                                  Excel/CSV/PDF/print, audit, backup, responsive
+                                                                                           refinements.
+
+                                                                                           Bug fixing, deployment, restore test,
+UAT & Final Delivery                           Minggu 7-8
+                                                                                           documentation, training, serah terima.
+
+
+Dependencies dari Klien
+• Daftar Job awal dan contoh SOP produksi.
+• Daftar bahan, satuan, target produksi, dan format batch yang diinginkan.
+• Daftar operator/admin/supervisor dan role.
+• Perangkat local server, tablet, LAN/Wi-Fi, dan akses instalasi.
+• Feedback dan approval maksimal 2 hari kerja per tahap untuk menjaga timeline.
+• PIC UAT yang memahami proses produksi.
+
+18. Risiko dan Mitigasi
+                ID                               Risiko                            Level                              Mitigasi
+
+                                                                                                        Survey jaringan, IP statis,
+R-01                              Wi-Fi area produksi tidak stabil       High                           reconnect handling, dan access
+                                                                                                        point yang memadai.
+
+                                                                                                        Auto-start service, UPS opsional,
+R-02                              Server PC dimatikan/bermasalah         High
+                                                                                                        backup eksternal, dan SOP restart.
+
+                                  Scope bertambah selama                                                PRD approval, backlog, dan
+R-03                                                                     High
+                                  development                                                           Change Request terpisah.
+
+                                                                                                        Gunakan sample Job dan freeze
+R-04                              SOP/data awal belum final              Medium
+                                                                                                        data sebelum UAT.
+
+                                                                                                        UI sederhana, tombol besar,
+R-05                              Operator belum terbiasa                Medium
+                                                                                                        training, dan quick guide.
+
+                                                                                                        Pagination, filter wajib, background
+R-06                              Export report sangat besar             Medium                         generation, dan batas rentang
+                                                                                                        periode.
+
+                                  Backup hanya tersimpan di server                                      Salin backup ke USB/NAS/PC lain
+R-07                                                                     High
+                                  yang sama                                                             secara terjadwal.
+
+                                                                                                        Timer dan timestamp mengacu
+R-08                              Perubahan jam perangkat                Medium
+                                                                                                        waktu server.
+
+
+19. Roadmap Pengembangan Berikutnya
+• Phase 2+: Secure remote access melalui VPN untuk admin dari luar lokasi.
+
+                                       CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+                                                                       PRODUCT REQUIREMENTS DOCUMENT - DWI PRODUCTION TRACKING
+
+
+ • Integrasi timbangan digital, flow meter, PLC, atau mesin produksi.
+ • QR/barcode batch dan scanning material.
+ • Inventory bahan dan integrasi ERP/accounting.
+ • Photo evidence dan digital signature per step.
+ • Approval QC berlapis dan release product.
+ • WhatsApp/Telegram alert untuk paused, overdue, atau completion.
+ • Multi-plant dan centralized reporting.
+ • OEE, yield, waste, downtime, dan advanced analytics.
+
+20. Glosarium
+                              Istilah                                                                 Definisi
+
+DWI                                                                  Digital Work Instruction; instruksi kerja digital step-by-step.
+
+                                                                     Template proses produksi yang memiliki bahan, step, timer, dan
+Job
+                                                                     aturan.
+
+Job Version                                                          Snapshot Job yang dipublish dan tidak berubah.
+
+Batch                                                                Satu pelaksanaan Job untuk produksi tertentu.
+
+Step/Substep                                                         Tahapan aktivitas yang harus dijalankan operator.
+
+Branching                                                            Aturan alur berdasarkan jawaban YES/NO atau kondisi lain.
+
+Paused                                                               Status berhenti sementara karena kendala/NO/supervisor.
+
+Audit Trail                                                          Riwayat siapa melakukan apa dan kapan.
+
+Local Server                                                         Komputer internal yang menjalankan aplikasi/database.
+
+LAN                                                                  Jaringan internal lokasi yang menghubungkan server, PC, dan tablet.
+
+UAT                                                                  User Acceptance Test oleh user bisnis sebelum serah terima.
+
+
+21. Approval
+Dengan persetujuan dokumen ini, para pihak menyatakan bahwa requirement di dalamnya menjadi baseline scope
+development. Perubahan setelah approval dapat diproses sebagai Change Request dan dapat memengaruhi biaya serta
+timeline.
+
+
+         Untuk CV AUTOMOVA DETAILING INDONESIA                                             Penyusun / Pengembang
+
+                        Bapak Suganda                                                      Dicky Rachmat Iskandar
+
+
+
+
+               Tanda tangan: ____________________                                  Tanda tangan: ____________________
+
+               Tanggal: ________________________                                   Tanggal: ________________________
+
+
+
+
+                                        CV AUTOMOVA DETAILING INDONESIA | Confidential | PRD v1.0
+

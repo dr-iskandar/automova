@@ -1,0 +1,16 @@
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-label-container, .print-label-container * {
+    visibility: visible;
+  }
+  .print-label-container {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 10cm;
+    height: 10cm;
+  }
+}
