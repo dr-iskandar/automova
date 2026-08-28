@@ -1449,6 +1449,10 @@ export function OperatorPerformance({
 
   useEffect(() => {
     queueMicrotask(() => void load());
+    const timer = window.setInterval(() => {
+      void load();
+    }, 10000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
   const handleSort = (field: keyof Performance) => {
@@ -1782,6 +1786,10 @@ export function DatabaseBatchHistory({
   }, [from, status, to]);
   useEffect(() => {
     queueMicrotask(() => void load().catch((error) => notify(error.message)));
+    const timer = window.setInterval(() => {
+      void load().catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, [load, notify]);
   const openDetail = async (id: string) => {
     try {
@@ -2699,6 +2707,10 @@ export function DynamicDashboard({
   }, [from, to]);
   useEffect(() => {
     queueMicrotask(() => void load().catch((error) => notify(error.message)));
+    const timer = window.setInterval(() => {
+      void load().catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, [load, notify]);
   const maximum = Math.max(
     1,
@@ -3017,6 +3029,10 @@ export function MaterialLedger({
   }, [from, materialId, movementType, to]);
   useEffect(() => {
     queueMicrotask(() => void load().catch((error) => notify(error.message)));
+    const timer = window.setInterval(() => {
+      void load().catch(() => undefined);
+    }, 10000);
+    return () => window.clearInterval(timer);
   }, [load, notify]);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -4863,6 +4879,10 @@ export function PackagingLedger({
   }, [from, packagingId, movementType, to]);
   useEffect(() => {
     queueMicrotask(() => void load().catch((error) => notify(error.message)));
+    const timer = window.setInterval(() => {
+      void load().catch(() => undefined);
+    }, 10000);
+    return () => window.clearInterval(timer);
   }, [load, notify]);
   const submit = async (event: FormEvent) => {
     event.preventDefault();

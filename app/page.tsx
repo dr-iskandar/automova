@@ -629,109 +629,137 @@ export default function Home({
       !popupLoaded ||
       !authUser ||
       role !== "operator" ||
-      jobs.length === 0 ||
-      syncAttempted.current
+      jobs.length === 0
     )
       return;
 
-    if (!batch) {
-      syncAttempted.current = true;
-      const syncActiveBatch = async () => {
-        try {
-          const params = new URLSearchParams({
-            from: "2020-01-01",
-            operator: authUser.id,
-          });
-          const response = await apiFetch<{ data: Array<Record<string, unknown>> }>(
-            `/batches?${params}`,
-          );
-          if (response.data && response.data.length > 0) {
-            const activeRaw = response.data.find(
-              (b: any) =>
-                b.status === "In Progress" ||
-                b.status === "Ready" ||
-                b.status === "Paused",
-            );
-            if (!activeRaw) return;
+    const syncActiveBatch = async () => {
+      try {
+        const params = new URLSearchParams({
+          from: "2020-01-01",
+          operator: authUser.id,
+        });
+        const response = await apiFetch<{ data: Array<Record<string, unknown>> }>(
+          `/batches?${params}`,
+        );
+        
+        const activeRaw = response.data ? response.data.find(
+          (b: any) =>
+            b.status === "In Progress" ||
+            b.status === "Ready" ||
+            b.status === "Paused",
+        ) : null;
 
-            const detailRes = await apiFetch<{ data: Record<string, any> }>(
-              `/batches/${activeRaw.id}`,
-            );
-            const serverBatch = detailRes.data;
-
-            const jobSnap = jobs.find((j) => j.id === serverBatch.job_id);
-            if (!jobSnap) return;
-
-            const parsedEvents = (serverBatch.events || []).map((e: any) => ({
-              time: e.event_time,
-              title: e.title,
-              detail: e.detail,
-              tone:
-                e.event_type === "start" || e.event_type === "step"
-                  ? "blue"
-                  : e.event_type === "pause"
-                    ? "orange"
-                    : "green",
-            }));
-
-            let stepState: StepState = "ready";
-            let stepEndsAt = 0;
-
-            let pausedRemainingSeconds: number | undefined = undefined;
-
-            if (serverBatch.status === "Ready") {
-              stepState = "ready";
-            } else if (serverBatch.status === "Paused") {
-              stepState = "paused";
-              pausedRemainingSeconds = 0;
-            } else if (serverBatch.status === "In Progress") {
-              const lastStart = [...parsedEvents]
-                .reverse()
-                .find(
-                  (e: any) =>
-                    e.title.includes("dimulai") || e.title.includes("dilanjutkan"),
-                );
-              if (lastStart && (jobSnap.steps || [])[serverBatch.current_step]) {
-                stepEndsAt =
-                  new Date(lastStart.time).getTime() +
-                  (jobSnap.steps || [])[serverBatch.current_step].duration * 1000;
-                if (stepEndsAt < Date.now()) {
-                  stepState = "confirm";
-                } else {
-                  stepState = "running";
-                }
-              } else {
-                stepState = "running";
-              }
-            }
-
-            const reconstructedBatch: Batch = {
-              id: serverBatch.id,
-              jobSnapshot: jobSnap,
-              operator: serverBatch.operator_name,
-              startedAt: new Date(serverBatch.started_at).getTime(),
-              completedAt: serverBatch.completed_at
-                ? new Date(serverBatch.completed_at).getTime()
-                : undefined,
-              currentStep: serverBatch.current_step,
-              stepState,
-              stepEndsAt,
-              status: serverBatch.status as BatchStatus,
-              notes: {},
-              events: parsedEvents,
-              output: serverBatch.output ?? undefined,
-              pausedRemainingSeconds,
-            };
-
-            setBatch(reconstructedBatch);
-            setToast("Pekerjaan aktif dipulihkan dari server.");
+        if (!activeRaw) {
+          // If we had an active batch locally, but the server says there is none,
+          // and it's not a newly created batch (startedAt is older than 5s to avoid race)
+          if (batch && Date.now() - batch.startedAt > 5000) {
+            setBatch(null);
+            setView("home");
+            setToast("Pekerjaan aktif telah diselesaikan atau dibatalkan dari perangkat lain.");
           }
-        } catch (err) {
-          console.error("Gagal sinkronisasi batch aktif", err);
+          return;
         }
-      };
+
+        const detailRes = await apiFetch<{ data: Record<string, any> }>(
+          `/batches/${activeRaw.id}`,
+        );
+        const serverBatch = detailRes.data;
+
+        const jobSnap = jobs.find((j) => j.id === serverBatch.job_id);
+        if (!jobSnap) return;
+
+        const parsedEvents = (serverBatch.events || []).map((e: any) => ({
+          time: e.event_time,
+          title: e.title,
+          detail: e.detail,
+          tone:
+            e.event_type === "start" || e.event_type === "step"
+              ? "blue"
+              : e.event_type === "pause"
+                ? "orange"
+                : "green",
+        }));
+
+        let stepState: StepState = "ready";
+        let stepEndsAt = 0;
+        let pausedRemainingSeconds: number | undefined = undefined;
+
+        if (serverBatch.status === "Ready") {
+          stepState = "ready";
+        } else if (serverBatch.status === "Paused") {
+          stepState = "paused";
+          pausedRemainingSeconds = 0;
+        } else if (serverBatch.status === "In Progress") {
+          const lastStart = [...parsedEvents]
+            .reverse()
+            .find(
+              (e: any) =>
+                e.title.includes("dimulai") || e.title.includes("dilanjutkan"),
+            );
+          if (lastStart && (jobSnap.steps || [])[serverBatch.current_step]) {
+            stepEndsAt =
+              new Date(lastStart.time).getTime() +
+              (jobSnap.steps || [])[serverBatch.current_step].duration * 1000;
+            if (stepEndsAt < Date.now()) {
+              stepState = "confirm";
+            } else {
+              stepState = "running";
+            }
+          } else {
+            stepState = "running";
+          }
+        }
+
+        // Compare if we need to update state
+        const isDifferent =
+          !batch ||
+          batch.id !== serverBatch.id ||
+          batch.status !== serverBatch.status ||
+          batch.currentStep !== serverBatch.current_step ||
+          batch.events.length !== parsedEvents.length ||
+          Math.abs(batch.stepEndsAt - stepEndsAt) > 2000; // allow small drift
+
+        if (isDifferent) {
+          const reconstructedBatch: Batch = {
+            id: serverBatch.id,
+            jobSnapshot: jobSnap,
+            operator: serverBatch.operator_name,
+            startedAt: new Date(serverBatch.started_at).getTime(),
+            completedAt: serverBatch.completed_at
+              ? new Date(serverBatch.completed_at).getTime()
+              : undefined,
+            currentStep: serverBatch.current_step,
+            stepState,
+            stepEndsAt,
+            status: serverBatch.status as BatchStatus,
+            notes: {},
+            events: parsedEvents,
+            output: serverBatch.output ?? undefined,
+            pausedRemainingSeconds,
+          };
+
+          setBatch(reconstructedBatch);
+          if (!batch) {
+            setView("active");
+            setToast("Pekerjaan aktif dipulihkan dari server.");
+          } else if (batch.id !== serverBatch.id) {
+            setView("active");
+            setToast("Pekerjaan aktif diperbarui dari server.");
+          }
+        }
+      } catch (err) {
+        console.error("Gagal sinkronisasi batch aktif", err);
+      }
+    };
+
+    void syncActiveBatch();
+
+    const timer = window.setInterval(() => {
       void syncActiveBatch();
-    }
+    }, 5000);
+
+    return () => window.clearInterval(timer);
   }, [hydrated, authUser, popupLoaded, role, jobs, batch]);
 
   useEffect(() => {
