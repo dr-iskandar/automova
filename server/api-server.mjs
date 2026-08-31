@@ -629,12 +629,24 @@ const server = createServer(async (req, res) => {
   );
   const path = url.pathname;
   try {
-    if (path === "/api/health" && req.method === "GET")
+    if (path === "/api/health" && req.method === "GET") {
+      const os = await import("node:os");
+      const interfaces = os.networkInterfaces();
+      const ips = [];
+      for (const name of Object.keys(interfaces)) {
+        for (const net of interfaces[name]) {
+          if (net.family === "IPv4" && !net.internal) {
+            ips.push({ name, address: net.address });
+          }
+        }
+      }
       return json(res, 200, {
         ok: true,
         database: databasePath,
         time: new Date().toISOString(),
+        ips,
       });
+    }
 
     if (path === "/api/auth/login" && req.method === "POST") {
       const body = await readBody(req);
