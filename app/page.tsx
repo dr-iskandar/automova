@@ -635,6 +635,9 @@ export default function Home({
 
     const syncActiveBatch = async () => {
       try {
+        // If current local batch is already completed, do not interrupt completion UI
+        if (batch && (batch.status === "Completed" || batch.stepState === "completed")) return;
+
         const params = new URLSearchParams({
           from: "2020-01-01",
           operator: authUser.id,
@@ -651,8 +654,8 @@ export default function Home({
         ) : null;
 
         if (!activeRaw) {
-          // If we had an active batch locally, but the server says there is none,
-          // and it's not a newly created batch (startedAt is older than 5s to avoid race)
+          // If local batch is completed, do not clear it
+          if (batch && (batch.status === "Completed" || batch.stepState === "completed")) return;
           if (batch && Date.now() - batch.startedAt > 5000) {
             setBatch(null);
             setView("home");
@@ -665,6 +668,11 @@ export default function Home({
           `/batches/${activeRaw.id}`,
         );
         const serverBatch = detailRes.data;
+
+        // If local batch is ahead of server batch step index or already completed, don't revert
+        if (batch && batch.id === serverBatch.id && (batch.status === "Completed" || serverBatch.current_step < batch.currentStep)) {
+          return;
+        }
 
         const jobSnap = jobs.find((j) => j.id === serverBatch.job_id);
         if (!jobSnap) return;
@@ -1924,7 +1932,10 @@ export default function Home({
               if (isLast) {
                 const d = new Date();
                 const ddmmyy = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getFullYear()).slice(2)}`;
-                void getProductionSeqOfToday(batch.id, batch.jobSnapshot.id, new Date(batch.startedAt).toISOString()).then((seq) => {
+                const startedIso = (batch.startedAt && !isNaN(new Date(batch.startedAt).getTime()))
+                  ? new Date(batch.startedAt).toISOString()
+                  : new Date().toISOString();
+                const handleComplete = (seq: number) => {
                   const code = (batch.jobSnapshot.product_code || "N/A").trim();
                   const bNo = `${ddmmyy} ${code}_${seq}`;
                   confirmYes({
@@ -1936,7 +1947,13 @@ export default function Home({
                     batchNo: bNo,
                     actualMaterials: {}
                   });
-                });
+                };
+                getProductionSeqOfToday(batch.id, batch.jobSnapshot.id, startedIso)
+                  .then(handleComplete)
+                  .catch((err) => {
+                    console.error("Gagal getProductionSeqOfToday on alert expired:", err);
+                    handleComplete(1);
+                  });
               } else {
                 confirmYes();
               }
@@ -3013,21 +3030,35 @@ function ActiveBatch({
                 style={{ background: '#22c55e', color: '#fff', border: 'none', boxShadow: '0 8px 18px rgba(34, 197, 94, 0.24)' }}
                 onClick={() => {
                   if (batch.currentStep === (batch.jobSnapshot.steps || []).length - 1) {
-                    const d = new Date(fillingDate || Date.now());
+                    const fillingVal = fillingDate && !isNaN(new Date(fillingDate).getTime())
+                      ? fillingDate
+                      : new Date().toISOString().slice(0, 10);
+                    const d = new Date(fillingVal);
                     const ddmmyy = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getFullYear()).slice(2)}`;
-                    void getProductionSeqOfToday(batch.id, batch.jobSnapshot.id, new Date(batch.startedAt).toISOString()).then((seq) => {
+                    const startedIso = (batch.startedAt && !isNaN(new Date(batch.startedAt).getTime()))
+                      ? new Date(batch.startedAt).toISOString()
+                      : new Date().toISOString();
+
+                    const handleComplete = (seq: number) => {
                       const code = (batch.jobSnapshot.product_code || "").trim();
                       const bNo = `${ddmmyy} ${code}_${seq}`;
                       confirmYes({
                         packagingCode,
                         expiredDate,
                         storageLocation,
-                        fillingDate,
+                        fillingDate: fillingVal,
                         specialNotes,
                         batchNo: bNo,
                         actualMaterials
                       });
-                    });
+                    };
+
+                    getProductionSeqOfToday(batch.id, batch.jobSnapshot.id, startedIso)
+                      .then(handleComplete)
+                      .catch((err) => {
+                        console.error("Gagal mendeteksi sekuens produksi:", err);
+                        handleComplete(1);
+                      });
                   } else {
                     confirmYes();
                   }
@@ -3230,11 +3261,14 @@ function CompletionCard({
     setBatch(updatedBatch);
     persistBatch(updatedBatch);
 
+    const startedIso = (batch.startedAt && !isNaN(new Date(batch.startedAt).getTime()))
+      ? new Date(batch.startedAt).toISOString()
+      : new Date().toISOString();
     const seq = await getProductionSeqOfToday(
       batch.id,
       batch.jobSnapshot.id,
-      new Date(batch.startedAt).toISOString()
-    );
+      startedIso
+    ).catch(() => 1);
     const code = (batch.jobSnapshot.product_code || batch.jobSnapshot.product || "PRODUK").trim();
     const originalTitle = document.title || "AUTOMOVA";
     const titleEl = document.querySelector('title');
