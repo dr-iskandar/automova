@@ -689,18 +689,26 @@ export default function Home({
           stepState = "ready";
         } else if (serverBatch.status === "Paused") {
           stepState = "paused";
-          pausedRemainingSeconds = 0;
+          if (batch && batch.id === serverBatch.id && batch.pausedRemainingSeconds !== undefined && batch.pausedRemainingSeconds > 0) {
+            pausedRemainingSeconds = batch.pausedRemainingSeconds;
+          } else {
+            pausedRemainingSeconds = (jobSnap.steps || [])[serverBatch.current_step]?.duration || 0;
+          }
         } else if (serverBatch.status === "In Progress") {
-          const lastStart = [...parsedEvents]
+          // Search for step-specific start/resume event
+          const stepStartEvent = [...parsedEvents]
             .reverse()
             .find(
               (e: any) =>
-                e.title.includes("dimulai") || e.title.includes("dilanjutkan"),
+                e.title.includes(`Step ${serverBatch.current_step + 1}`) ||
+                e.title.includes(`step ${serverBatch.current_step + 1}`) ||
+                e.title.includes("dimulai") ||
+                e.title.includes("dilanjutkan"),
             );
-          if (lastStart && (jobSnap.steps || [])[serverBatch.current_step]) {
-            stepEndsAt =
-              new Date(lastStart.time).getTime() +
-              (jobSnap.steps || [])[serverBatch.current_step].duration * 1000;
+
+          if (stepStartEvent && (jobSnap.steps || [])[serverBatch.current_step]) {
+            const durationSec = (jobSnap.steps || [])[serverBatch.current_step].duration || 0;
+            stepEndsAt = new Date(stepStartEvent.time).getTime() + durationSec * 1000;
             if (stepEndsAt < Date.now()) {
               stepState = "confirm";
             } else {
@@ -708,17 +716,19 @@ export default function Home({
             }
           } else {
             stepState = "running";
+            const durationSec = (jobSnap.steps || [])[serverBatch.current_step]?.duration || 0;
+            stepEndsAt = Date.now() + durationSec * 1000;
           }
         }
 
         // Compare if we need to update state
+        // Only update if batch ID, status, current step, or event count changed
         const isDifferent =
           !batch ||
           batch.id !== serverBatch.id ||
           batch.status !== serverBatch.status ||
           batch.currentStep !== serverBatch.current_step ||
-          batch.events.length !== parsedEvents.length ||
-          Math.abs(batch.stepEndsAt - stepEndsAt) > 2000; // allow small drift
+          batch.events.length !== parsedEvents.length;
 
         if (isDifferent) {
           const reconstructedBatch: Batch = {
@@ -731,7 +741,7 @@ export default function Home({
               : undefined,
             currentStep: serverBatch.current_step,
             stepState,
-            stepEndsAt,
+            stepEndsAt: (batch && batch.id === serverBatch.id && batch.currentStep === serverBatch.current_step && batch.stepState === "running") ? batch.stepEndsAt : stepEndsAt,
             status: serverBatch.status as BatchStatus,
             notes: {},
             events: parsedEvents,
@@ -1292,13 +1302,23 @@ export default function Home({
     } else {
       const next = batch.currentStep + 1;
       const durationSec = (batch.jobSnapshot.steps || [])[next]?.duration || 0;
+      const stepEvents: BatchEvent[] = [
+        ...events,
+        {
+          time: new Date().toISOString(),
+          title: `Step ${next + 1} dimulai`,
+          detail: (batch.jobSnapshot.steps || [])[next]?.title || `Proses step ${next + 1}`,
+          tone: "blue",
+        },
+      ];
       const nextBatch: Batch = {
         ...batch,
         currentStep: next,
         stepState: "running",
         stepEndsAt: Date.now() + durationSec * 1000,
+        pausedRemainingSeconds: undefined,
         notes,
-        events,
+        events: stepEvents,
       };
       setBatch(nextBatch);
       persistBatch(nextBatch);
@@ -1322,13 +1342,13 @@ export default function Home({
       ...batch,
       status: "Paused",
       stepState: "paused",
-      pausedRemainingSeconds: 0,
+      pausedRemainingSeconds: remainingSec,
       notes: { ...batch.notes, [batch.currentStep]: finalNote },
       events: [
         ...batch.events,
         {
           time: new Date().toISOString(),
-          title: "Batch dijeda",
+          title: `Step ${batch.currentStep + 1} dijeda`,
           detail: finalNote || "Dihentikan sementara oleh operator",
           tone: "orange",
         },
@@ -1355,7 +1375,7 @@ export default function Home({
   const operatorResume = () => {
     if (!batch) return;
     alarmedStep.current = "";
-    const remainingSec = batch.pausedRemainingSeconds !== undefined 
+    const remainingSec = (batch.pausedRemainingSeconds !== undefined && batch.pausedRemainingSeconds > 0)
       ? batch.pausedRemainingSeconds 
       : ((batch.jobSnapshot.steps || [])[batch.currentStep]?.duration || 0);
     const nextBatch: Batch = {
@@ -1368,7 +1388,7 @@ export default function Home({
         ...batch.events,
         {
           time: new Date().toISOString(),
-          title: "Batch dilanjutkan",
+          title: `Step ${batch.currentStep + 1} dilanjutkan`,
           detail: "Operator melanjutkan proses yang dijeda.",
           tone: "blue",
         },
@@ -1416,7 +1436,7 @@ export default function Home({
       ...batch,
       status: "Paused",
       stepState: "paused",
-      pausedRemainingSeconds: 0,
+      pausedRemainingSeconds: remainingSec,
       notes,
       events,
     };
@@ -1456,20 +1476,20 @@ export default function Home({
       return;
     }
     alarmedStep.current = "";
-    const remainingSec = batch.pausedRemainingSeconds !== undefined 
+    const remainingSec = (batch.pausedRemainingSeconds !== undefined && batch.pausedRemainingSeconds > 0)
       ? batch.pausedRemainingSeconds 
       : ((batch.jobSnapshot.steps || [])[batch.currentStep]?.duration || 0);
     const nextBatch: Batch = {
       ...batch,
       status: "In Progress",
-      stepState: "running",
+      stepState: remainingSec <= 0 ? "confirm" : "running",
       stepEndsAt: Date.now() + remainingSec * 1000,
       pausedRemainingSeconds: undefined,
       events: [
         ...batch.events,
         {
           time: new Date().toISOString(),
-          title: "Batch dilanjutkan (Manual)",
+          title: `Step ${batch.currentStep + 1} dilanjutkan (Manual)`,
           detail: `Supervisor: ${reason}`,
           tone: "blue" as const,
         },
