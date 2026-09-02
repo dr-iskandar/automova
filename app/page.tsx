@@ -1596,7 +1596,7 @@ export default function Home({
         ...batch.events,
         {
           time: new Date().toISOString(),
-          title: "Overdrive Job",
+          title: `Step ${batch.currentStep + 1} selesai (Overdrive)`,
           detail: `Operator melakukan overdrive pada step terakhir (${stepInfo}).`,
           tone: "orange" as const,
         },
@@ -1611,22 +1611,31 @@ export default function Home({
       setBatch(nextBatch);
       persistBatch(nextBatch);
     } else {
-      const events = [
+      const next = batch.currentStep + 1;
+      const durationSec = (batch.jobSnapshot.steps || [])[next]?.duration || 0;
+      const nextStepInfo = (batch.jobSnapshot.steps || [])[next];
+      const events: BatchEvent[] = [
         ...batch.events,
         {
           time: new Date().toISOString(),
-          title: "Overdrive Job",
+          title: `Step ${batch.currentStep + 1} selesai (Overdrive)`,
           detail: `Operator melompati sisa waktu step (${stepInfo}).`,
           tone: "orange" as const,
         },
+        {
+          time: new Date().toISOString(),
+          title: `Step ${next + 1} dimulai`,
+          detail: nextStepInfo?.title || `Proses step ${next + 1}`,
+          tone: "blue" as const,
+        },
       ];
-      const next = batch.currentStep + 1;
-      const durationSec = (batch.jobSnapshot.steps || [])[next]?.duration || 0;
       const nextBatch: Batch = {
         ...batch,
+        status: "In Progress",
         currentStep: next,
         stepState: "running",
         stepEndsAt: Date.now() + durationSec * 1000,
+        pausedRemainingSeconds: undefined,
         notes,
         events,
       };
