@@ -693,11 +693,23 @@ export default function Home({
         let stepEndsAt = 0;
         let pausedRemainingSeconds: number | undefined = undefined;
 
+        const parseRemainingFromDetail = (detailStr?: string): number | null => {
+          if (!detailStr) return null;
+          const match = detailStr.match(/\[SISA:(\d+)s\]/);
+          return match ? parseInt(match[1], 10) : null;
+        };
+
         if (serverBatch.status === "Ready") {
           stepState = "ready";
         } else if (serverBatch.status === "Paused") {
           stepState = "paused";
-          if (batch && batch.id === serverBatch.id && batch.pausedRemainingSeconds !== undefined && batch.pausedRemainingSeconds > 0) {
+          const lastPauseEvent = [...parsedEvents].reverse().find((e: any) =>
+            e.title.includes(`Step ${serverBatch.current_step + 1}`) && e.title.includes("dijeda")
+          );
+          const parsedRem = parseRemainingFromDetail(lastPauseEvent?.detail);
+          if (parsedRem !== null) {
+            pausedRemainingSeconds = parsedRem;
+          } else if (batch && batch.id === serverBatch.id && batch.pausedRemainingSeconds !== undefined && batch.pausedRemainingSeconds > 0) {
             pausedRemainingSeconds = batch.pausedRemainingSeconds;
           } else {
             pausedRemainingSeconds = (jobSnap.steps || [])[serverBatch.current_step]?.duration || 0;
@@ -715,7 +727,11 @@ export default function Home({
             );
 
           if (stepStartEvent && (jobSnap.steps || [])[serverBatch.current_step]) {
-            const durationSec = (jobSnap.steps || [])[serverBatch.current_step].duration || 0;
+            const parsedRem = parseRemainingFromDetail(stepStartEvent.detail);
+            const durationSec = parsedRem !== null 
+              ? parsedRem 
+              : ((jobSnap.steps || [])[serverBatch.current_step].duration || 0);
+
             stepEndsAt = new Date(stepStartEvent.time).getTime() + durationSec * 1000;
             if (stepEndsAt < Date.now()) {
               stepState = "confirm";
@@ -727,6 +743,18 @@ export default function Home({
             const durationSec = (jobSnap.steps || [])[serverBatch.current_step]?.duration || 0;
             stepEndsAt = Date.now() + durationSec * 1000;
           }
+        }
+
+        // If local batch is actively running on the same batch & step, preserve local stepEndsAt to avoid tick drift
+        if (
+          batch &&
+          batch.id === serverBatch.id &&
+          batch.status === "In Progress" &&
+          batch.stepState === "running" &&
+          batch.currentStep === serverBatch.current_step &&
+          stepEndsAt > Date.now()
+        ) {
+          stepEndsAt = batch.stepEndsAt;
         }
 
         // Compare if we need to update state
@@ -1357,7 +1385,7 @@ export default function Home({
         {
           time: new Date().toISOString(),
           title: `Step ${batch.currentStep + 1} dijeda`,
-          detail: finalNote || "Dihentikan sementara oleh operator",
+          detail: `[SISA:${remainingSec}s] ${finalNote || "Dihentikan sementara oleh operator"}`,
           tone: "orange",
         },
       ],
@@ -1397,7 +1425,7 @@ export default function Home({
         {
           time: new Date().toISOString(),
           title: `Step ${batch.currentStep + 1} dilanjutkan`,
-          detail: "Operator melanjutkan proses yang dijeda.",
+          detail: `[SISA:${remainingSec}s] Operator melanjutkan proses yang dijeda.`,
           tone: "blue",
         },
       ],
@@ -1408,7 +1436,7 @@ export default function Home({
     setPin("");
     setReason("");
     setToast(
-      "Otorisasi berhasil. Operator harus menekan Mulai Step untuk menjalankan timer.",
+      "Otorisasi berhasil. Operator melanjutkan proses.",
     );
   };
 
@@ -1430,16 +1458,16 @@ export default function Home({
       return;
     }
     const notes = { ...batch.notes, [batch.currentStep]: reason };
+    const remainingSec = Math.max(0, Math.ceil((batch.stepEndsAt - Date.now()) / 1000));
     const events = [
       ...batch.events,
       {
         time: new Date().toISOString(),
         title: "Batch dijeda (Manual)",
-        detail: `Supervisor: ${reason}`,
+        detail: `[SISA:${remainingSec}s] Supervisor: ${reason}`,
         tone: "orange" as const,
       },
     ];
-    const remainingSec = Math.max(0, Math.ceil((batch.stepEndsAt - Date.now()) / 1000));
     const nextBatch: Batch = {
       ...batch,
       status: "Paused",
@@ -1498,7 +1526,7 @@ export default function Home({
         {
           time: new Date().toISOString(),
           title: `Step ${batch.currentStep + 1} dilanjutkan (Manual)`,
-          detail: `Supervisor: ${reason}`,
+          detail: `[SISA:${remainingSec}s] Supervisor: ${reason}`,
           tone: "blue" as const,
         },
       ],
@@ -6087,15 +6115,28 @@ function OverrideModal({
   setPin: (value: string) => void;
   reason: string;
   setReason: (value: string) => void;
-  onSubmit: (event: FormEvent) => void;
+  onSubmit: (event: FormEvent) => void | Promise<void>;
   onClose: () => void;
   title?: string;
   text?: string;
   reasonLabel?: string;
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(e);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="modal-backdrop-custom">
-      <form className="override-modal" onSubmit={onSubmit}>
+      <form className="override-modal" onSubmit={handleSubmit}>
         <button
           type="button"
           className="modal-close"
@@ -6131,11 +6172,19 @@ function OverrideModal({
           />
         </label>
         <div>
-          <button type="button" className="btn btn-light" onClick={onClose}>
+          <button type="button" className="btn btn-light" onClick={onClose} disabled={isSubmitting}>
             Nanti
           </button>
-          <button className="btn btn-primary" type="submit">
-            <i className="bi bi-unlock" /> Otorisasi & Resume
+          <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <i className="bi bi-arrow-repeat spin" style={{ display: 'inline-block' }} /> Memverifikasi...
+              </>
+            ) : (
+              <>
+                <i className="bi bi-unlock" /> Otorisasi & Submit
+              </>
+            )}
           </button>
         </div>
       </form>
