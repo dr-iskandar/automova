@@ -449,6 +449,10 @@ export default function Home({
   const [reportQuery, setReportQuery] = useState("");
   const [dbHistory, setDbHistory] = useState<HistoryRow[]>([]);
   const [databaseOnline, setDatabaseOnline] = useState(false);
+  const [serverLatency, setServerLatency] = useState<number | null>(null);
+  const [lastHealthCheck, setLastHealthCheck] = useState<string>("-");
+  const [netLogs, setNetLogs] = useState<Array<{ time: string; status: "ok" | "error"; message: string; latency?: number }>>([]);
+  const [showNetModal, setShowNetModal] = useState<boolean>(false);
   const [popupLoaded, setPopupLoaded] = useState(false);
   const [popupSetting, setPopupSetting] = useState<OperatorPopup>({
     enabled: true,
@@ -899,6 +903,55 @@ export default function Home({
     };
     void loadDatabase();
   }, []);
+
+  const checkHealth = useCallback(async () => {
+    const startTime = performance.now();
+    const timeStr = new Date().toLocaleTimeString("id-ID");
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(`${apiBase()}/health`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const rtt = Math.round(performance.now() - startTime);
+
+      if (res.ok) {
+        setServerLatency(rtt);
+        setLastHealthCheck(timeStr);
+        setDatabaseOnline((prev) => {
+          if (!prev) {
+            setNetLogs((logs) => [
+              { time: timeStr, status: "ok", message: `Server terhubung kembali (${rtt}ms)`, latency: rtt },
+              ...logs.slice(0, 49),
+            ]);
+          }
+          return true;
+        });
+      } else {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      const errMsg = err?.name === "AbortError" ? "Timeout (3s)" : (err?.message || "Koneksi terputus");
+      setServerLatency(null);
+      setLastHealthCheck(timeStr);
+      setDatabaseOnline((prev) => {
+        if (prev) {
+          setNetLogs((logs) => [
+            { time: timeStr, status: "error", message: `TERPUTUS: ${errMsg}` },
+            ...logs.slice(0, 49),
+          ]);
+        }
+        return false;
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkHealth();
+    const interval = setInterval(() => {
+      void checkHealth();
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [checkHealth]);
 
   useEffect(() => {
     const tick = window.setInterval(() => setNow(Date.now()), 1000);
@@ -1798,12 +1851,52 @@ export default function Home({
           roleName={authUser?.role_name || ""}
           operatorName={operatorName}
           databaseOnline={databaseOnline}
+          serverLatency={serverLatency}
+          onOpenNetLogs={() => setShowNetModal(true)}
           logout={logout}
           onNavigate={(target) => setView(target as View)}
           fullscreen={() => document.documentElement.requestFullscreen?.()}
           lowStockCount={lowStockItems.length}
           onOpenLowStockAlert={() => setShowLowStockModal(true)}
         />
+        {!databaseOnline && (
+          <div style={{
+            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+            color: '#ffffff',
+            padding: '10px 20px',
+            fontSize: '13px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
+            zIndex: 999
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <i className="bi bi-wifi-off" style={{ fontSize: '18px' }} />
+              <span>Perangkat terputus dari PC Server (192.168.100.75). Periksa koneksi Wi-Fi tablet.</span>
+            </div>
+            <button
+              onClick={() => setShowNetModal(true)}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: '1px solid rgba(255,255,255,0.5)',
+                color: '#fff',
+                padding: '5px 14px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <i className="bi bi-activity" /> Buka Log Monitoring
+            </button>
+          </div>
+        )}
         <div className="page-content">
           {isAdmin ? (
             <AdminContent
@@ -2036,6 +2129,16 @@ export default function Home({
           </div>
         </div>
       )}
+      {showNetModal && (
+        <NetworkMonitoringModal
+          onClose={() => setShowNetModal(false)}
+          isOnline={databaseOnline}
+          latency={serverLatency}
+          lastCheck={lastHealthCheck}
+          logs={netLogs}
+          onTestPing={checkHealth}
+        />
+      )}
     </div>
   );
 }
@@ -2175,6 +2278,8 @@ function Topbar({
   roleName,
   operatorName,
   databaseOnline,
+  serverLatency,
+  onOpenNetLogs,
   logout,
   onNavigate,
   fullscreen,
@@ -2185,6 +2290,8 @@ function Topbar({
   roleName?: string;
   operatorName: string;
   databaseOnline: boolean;
+  serverLatency?: number | null;
+  onOpenNetLogs?: () => void;
   logout: () => void;
   onNavigate: (view: string) => void;
   fullscreen: () => void;
@@ -2199,10 +2306,20 @@ function Topbar({
         <img src={role === "operator" ? "/movacorp-logo-white.png" : "/movacorp-logo.png"} alt="Movacorp Logo" style={{ height: "38px", objectFit: "contain" }} />
       </div>
       <div className="topbar-context">
-        <span className={`connection-pill ${databaseOnline ? "" : "offline"}`}>
+        <button
+          type="button"
+          onClick={onOpenNetLogs}
+          className={`connection-pill ${databaseOnline ? "" : "offline"}`}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 10px', font: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          title="Klik untuk membuka Diagnostik Monitoring Koneksi Network"
+        >
           <span />{" "}
-          {databaseOnline ? "Database LAN Connected" : "Database API Offline"}
-        </span>
+          {databaseOnline ? (
+            <>LAN Connected {serverLatency !== null ? `(${serverLatency}ms)` : ""}</>
+          ) : (
+            <>⚠️ Server Terputus (Offline)</>
+          )}
+        </button>
       </div>
       <div className="topbar-actions">
         {(role === "admin" || role === "supervisor") && (
@@ -6657,5 +6774,105 @@ export function PrintableLabel({
       </div>
     </div>,
     document.body
+  );
+}
+
+function NetworkMonitoringModal({
+  onClose,
+  isOnline,
+  latency,
+  lastCheck,
+  logs,
+  onTestPing,
+}: {
+  onClose: () => void;
+  isOnline: boolean;
+  latency: number | null;
+  lastCheck: string;
+  logs: Array<{ time: string; status: "ok" | "error"; message: string; latency?: number }>;
+  onTestPing: () => Promise<void>;
+}) {
+  const [testing, setTesting] = useState(false);
+
+  const handleManualPing = async () => {
+    setTesting(true);
+    try {
+      await onTestPing();
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop-custom" style={{ zIndex: 10000 }}>
+      <div className="override-modal" style={{ maxWidth: '640px', width: '92vw' }}>
+        <button type="button" className="modal-close" onClick={onClose}>
+          <i className="bi bi-x-lg" />
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '24px', color: isOnline ? '#10b981' : '#ef4444' }}>
+            <i className={`bi ${isOnline ? 'bi-wifi' : 'bi-wifi-off'}`} />
+          </span>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Network & Server Monitoring</h2>
+            <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Diagnostik Koneksi Real-time Tablet ke PC Server</p>
+          </div>
+        </div>
+
+        {/* Status Metrics Card */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', margin: '16px 0', background: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+          <div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>STATUS KONEKSI</div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: isOnline ? '#10b981' : '#ef4444', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? '#10b981' : '#ef4444', display: 'inline-block' }} />
+              {isOnline ? "Terhubung (Online)" : "Terputus (Offline)"}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>PING / LATENCY</div>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+              {latency !== null ? `${latency} ms` : "-"}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>TES TERAKHIR</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: '#334155' }}>{lastCheck || "-"}</div>
+          </div>
+        </div>
+
+        {/* Log History */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>Riwayat Log Diagnostik</h3>
+          <button
+            type="button"
+            className="btn btn-light"
+            onClick={handleManualPing}
+            disabled={testing}
+            style={{ padding: '4px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <i className={`bi ${testing ? 'bi-arrow-repeat spin' : 'bi-arrow-clockwise'}`} />
+            {testing ? "Memeriksa..." : "Tes Koneksi Sekarang"}
+          </button>
+        </div>
+
+        <div style={{ maxHeight: '220px', overflowY: 'auto', background: '#0f172a', color: '#f8fafc', padding: '12px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px', lineHeight: 1.6 }}>
+          {logs.length === 0 ? (
+            <div style={{ color: '#94a3b8' }}>Belum ada catatan log koneksi terputus. Semua berjalan normal.</div>
+          ) : (
+            logs.map((log, idx) => (
+              <div key={idx} style={{ color: log.status === 'ok' ? '#34d399' : '#f87171', borderBottom: '1px solid #1e293b', paddingBottom: '4px', marginBottom: '4px' }}>
+                <span style={{ color: '#94a3b8' }}>[{log.time}]</span> {log.message}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button type="button" className="btn btn-primary" onClick={onClose}>
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
