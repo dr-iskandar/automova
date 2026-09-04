@@ -18,6 +18,7 @@ import {
   TutorialButton,
   UserMaster,
   GenericMasterList,
+  checkAdminPriceAccess,
 } from "./master-data";
 import { PrintableTicket } from "./printable-ticket";
 
@@ -4245,9 +4246,9 @@ function AdminContent(props: {
       />
     );
   if (view === "jobs")
-    return <JobManagement authUser={props.authUser} jobs={jobs} setJobs={setJobs} setToast={setToast} availableSounds={availableSounds} />;
-  if (view === "materials") return <MaterialMaster authUser={props.authUser} notify={setToast} />;
-  if (view === "master-packaging") return <PackagingMaster authUser={props.authUser} notify={setToast} />;
+    return <JobManagement authUser={props.authUser} role={props.role} jobs={jobs} setJobs={setJobs} setToast={setToast} availableSounds={availableSounds} />;
+  if (view === "materials") return <MaterialMaster authUser={props.authUser} role={props.role} notify={setToast} />;
+  if (view === "master-packaging") return <PackagingMaster authUser={props.authUser} role={props.role} notify={setToast} />;
   if (view === "master-areas") return <GenericMasterList title="Area Produksi" endpoint="/master_areas" notify={setToast} />;
   if (view === "master-lines") return <GenericMasterList title="Line Operasional" endpoint="/master_lines" hasAreaId notify={setToast} />;
   if (view === "master-shifts") return <GenericMasterList title="Shift Kerja" endpoint="/master_shifts" notify={setToast} />;
@@ -4259,7 +4260,7 @@ function AdminContent(props: {
   if (view === "performance") return <OperatorPerformance notify={setToast} />;
   if (view === "history")
     return <DatabaseBatchHistory notify={setToast} role={props.role} authUser={props.authUser} />;
-  if (view === "reports") return <ReportManager notify={setToast} authUser={props.authUser} />;
+  if (view === "reports") return <ReportManager notify={setToast} role={props.role} authUser={props.authUser} />;
   if (view === "settings") return <SystemSettingsMaster notify={setToast} />;
   return (
     <DynamicDashboard role={props.role} notify={setToast} onNavigate={() => setView("history")} />
@@ -4464,14 +4465,16 @@ function JobManagement({
   setJobs,
   setToast,
   availableSounds = [],
+  role,
 }: {
   authUser: any;
   jobs: Job[];
   setJobs: React.Dispatch<React.SetStateAction<Job[]>>;
   setToast: (value: string) => void;
   availableSounds?: { id: string; name: string; filename: string }[];
+  role?: string;
 }) {
-  const isSuperUser = authUser?.username?.toLowerCase() === "suganda" || authUser?.username?.toLowerCase() === "admin";
+  const isSuperUser = checkAdminPriceAccess(authUser, role);
   // ─── State ───────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState(-1);
   const [materialMaster, setMaterialMaster] = useState<

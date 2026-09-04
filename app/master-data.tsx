@@ -4,6 +4,20 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "./api";
 import { PrintableTicket } from "./printable-ticket";
 
+export const checkAdminPriceAccess = (authUser?: any, role?: string) => {
+  if (role === "admin") return true;
+  if (!authUser) return false;
+  const username = authUser.username?.toLowerCase() || "";
+  const roleId = authUser.role_id?.toLowerCase() || "";
+  const roleName = authUser.role_name?.toLowerCase() || "";
+  return (
+    roleId === "role-admin" ||
+    roleName.includes("admin") ||
+    username === "suganda" ||
+    username === "admin"
+  );
+};
+
 type TutorialStep = { title: string; text: string; icon: string };
 
 const TUTORIALS: Record<
@@ -412,13 +426,15 @@ export function TablePagination({
 
 export function MaterialMaster({
   authUser,
+  role,
   notify,
 }: {
   authUser: any;
+  role?: string;
   notify: (message: string) => void;
 }) {
   const tutorial = useTutorial("materials");
-  const isSuperUser = authUser?.username?.toLowerCase() === "suganda" || authUser?.username?.toLowerCase() === "admin";
+  const isSuperUser = checkAdminPriceAccess(authUser, role);
   const empty: Material = {
     id: "",
     code: "",
@@ -1768,7 +1784,7 @@ export function DatabaseBatchHistory({
   role?: "admin" | "supervisor";
   authUser?: any;
 }) {
-  const isSuperUser = authUser?.username?.toLowerCase() === "suganda" || authUser?.username?.toLowerCase() === "admin";
+  const isSuperUser = checkAdminPriceAccess(authUser, role);
   const [items, setItems] = useState<BatchRow[]>([]);
   const [query, setQuery] = useState("");
   const [detail, setDetail] = useState<BatchRow | null>(null);
@@ -3466,12 +3482,14 @@ type FinanceData = {
 
 export function ReportManager({
   notify,
+  role,
   authUser,
 }: {
   notify: (message: string) => void;
+  role?: string;
   authUser?: any;
 }) {
-  const isSuperUser = authUser?.username?.toLowerCase() === "suganda" || authUser?.username?.toLowerCase() === "admin";
+  const isSuperUser = checkAdminPriceAccess(authUser, role);
   const [from, setFrom] = useState(() => offsetDate(-7));
   const [to, setTo] = useState(() => offsetDate(0));
   const [status, setStatus] = useState("");
@@ -5282,13 +5300,15 @@ export function PackagingLedger({
 
 export function PackagingMaster({
   authUser,
+  role,
   notify,
 }: {
   authUser: any;
+  role?: string;
   notify: (message: string) => void;
 }) {
   const tutorial = useTutorial("packagings");
-  const isSuperUser = authUser?.username?.toLowerCase() === "suganda" || authUser?.username?.toLowerCase() === "admin";
+  const isSuperUser = checkAdminPriceAccess(authUser, role);
   const empty: Packaging = {
     id: "",
     code: "",
