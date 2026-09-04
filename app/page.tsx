@@ -3187,11 +3187,11 @@ function ActiveBatch({
                     const fillingVal = fillingDate && !isNaN(new Date(fillingDate).getTime())
                       ? fillingDate
                       : new Date().toISOString().slice(0, 10);
-                    const d = new Date(fillingVal);
-                    const ddmmyy = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getFullYear()).slice(2)}`;
                     const startedIso = (batch.startedAt && !isNaN(new Date(batch.startedAt).getTime()))
                       ? new Date(batch.startedAt).toISOString()
                       : new Date().toISOString();
+                    const prodDate = new Date(startedIso);
+                    const ddmmyy = `${String(prodDate.getDate()).padStart(2, '0')}${String(prodDate.getMonth() + 1).padStart(2, '0')}${String(prodDate.getFullYear()).slice(2)}`;
 
                     const handleComplete = (seq: number) => {
                       const code = (batch.jobSnapshot.product_code || "").trim();
@@ -3403,17 +3403,9 @@ function CompletionCard({
       return;
     }
 
-    // Persist updated values before printing
-    const updatedBatch: Batch = {
-      ...batch,
-      output: Number(output) || 0,
-      storage_location: storageLocation,
-      filling_date: fillingDate,
-      expired_date: expiredDate,
-      special_notes: specialNotes,
-    };
-    setBatch(updatedBatch);
-    persistBatch(updatedBatch);
+    const dProd = new Date(batch.startedAt || Date.now());
+    const ddmmyy = `${String(dProd.getDate()).padStart(2, '0')}${String(dProd.getMonth() + 1).padStart(2, '0')}${String(dProd.getFullYear()).slice(2)}`;
+    const code = (batch.jobSnapshot.product_code || batch.jobSnapshot.product || "PRODUK").trim();
 
     const startedIso = (batch.startedAt && !isNaN(new Date(batch.startedAt).getTime()))
       ? new Date(batch.startedAt).toISOString()
@@ -3423,13 +3415,27 @@ function CompletionCard({
       batch.jobSnapshot.id,
       startedIso
     ).catch(() => 1);
-    const code = (batch.jobSnapshot.product_code || batch.jobSnapshot.product || "PRODUK").trim();
+    
+    const rawBatchNo = batch.batch_no || `${ddmmyy} ${code}_${seq}`;
+    const effectiveBatchNo = rawBatchNo.replace(/^\d{6}/, ddmmyy);
+
+    // Persist updated values before printing
+    const updatedBatch: Batch = {
+      ...batch,
+      batch_no: effectiveBatchNo,
+      output: Number(output) || 0,
+      storage_location: storageLocation,
+      filling_date: fillingDate,
+      expired_date: expiredDate,
+      special_notes: specialNotes,
+    };
+    setBatch(updatedBatch);
+    persistBatch(updatedBatch);
+
     const originalTitle = document.title || "AUTOMOVA";
     const titleEl = document.querySelector('title');
-    const d = new Date(batch.startedAt);
-    const ddmmyy = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getFullYear()).slice(2)}`;
     
-    const newTitle = batch.batch_no || `${ddmmyy} ${code}_${seq}`;
+    const newTitle = effectiveBatchNo;
     document.title = newTitle;
     if (titleEl) {
       titleEl.textContent = newTitle;
@@ -3533,56 +3539,72 @@ function CompletionCard({
         </div>
 
         <div className="completion-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '24px' }}>
-          <PrintableLabel 
-            batchNo={batch.batch_no || batch.id}
-            productCode={batch.jobSnapshot.product_code || "-"}
-            productName={batch.jobSnapshot.product}
-            packagingCode={batch.packaging_code || "-"}
-            fillingDate={fillingDate || "-"}
-            expiredDate={expiredDate || "-"}
-            storageLocation={storageLocation || "-"}
-            output={output || 0}
-            unit={batch.jobSnapshot.unit}
-            specialNotes={specialNotes || ""}
-          />
-          <button
-            className="btn btn-primary btn-lg"
-            onClick={handlePrint}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2', padding: '12px' }}
-          >
-            <div><i className="bi bi-printer" /> PRINT LABEL</div>
-            <small style={{ fontSize: '11px', fontWeight: 'normal', opacity: 0.8, marginTop: '4px' }}>(Instruksi: Tempelkan pada drum yang telah selesai produksi)</small>
-          </button>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              className="btn btn-outline-primary"
-              style={{ flex: 1 }}
-              onClick={() => setView("history")}
-            >
-              <i className="bi bi-clock-history" /> Lihat History
-            </button>
-            <button className="btn btn-outline-secondary" style={{ flex: 1 }} onClick={() => setView("home")}>
-              <i className="bi bi-house-door" /> Kembali
-            </button>
-          </div>
+          {(() => {
+            const dCard = new Date(batch.startedAt || Date.now());
+            const ddmmyyCard = `${String(dCard.getDate()).padStart(2, '0')}${String(dCard.getMonth() + 1).padStart(2, '0')}${String(dCard.getFullYear()).slice(2)}`;
+            const computedBatchNo = (batch.batch_no || batch.id).replace(/^\d{6}/, ddmmyyCard);
+            return (
+              <>
+                <PrintableLabel 
+                  batchNo={computedBatchNo}
+                  productCode={batch.jobSnapshot.product_code || "-"}
+                  productName={batch.jobSnapshot.product}
+                  packagingCode={batch.packaging_code || "-"}
+                  fillingDate={fillingDate || "-"}
+                  expiredDate={expiredDate || "-"}
+                  storageLocation={storageLocation || "-"}
+                  output={output || 0}
+                  unit={batch.jobSnapshot.unit}
+                  specialNotes={specialNotes || ""}
+                />
+                <button
+                  className="btn btn-primary btn-lg"
+                  onClick={handlePrint}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2', padding: '12px' }}
+                >
+                  <div><i className="bi bi-printer" /> PRINT LABEL</div>
+                  <small style={{ fontSize: '11px', fontWeight: 'normal', opacity: 0.8, marginTop: '4px' }}>(Instruksi: Tempelkan pada drum yang telah selesai produksi)</small>
+                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="btn btn-outline-primary"
+                    style={{ flex: 1 }}
+                    onClick={() => setView("history")}
+                  >
+                    <i className="bi bi-clock-history" /> Lihat History
+                  </button>
+                  <button className="btn btn-outline-secondary" style={{ flex: 1 }} onClick={() => setView("home")}>
+                    <i className="bi bi-house-door" /> Kembali
+                  </button>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
-      <PrintableTicket batch={{
-        batch_no: batch.batch_no || batch.id,
-        job_name: batch.jobSnapshot.name,
-        operator: batch.operator,
-        line: batch.jobSnapshot.line,
-        start_time: new Date(batch.startedAt).toISOString(),
-        end_time: batch.completedAt ? new Date(batch.completedAt).toISOString() : undefined,
-        output_qty: output,
-        unit: batch.jobSnapshot.unit,
-        status: batch.status,
-        product_code: batch.jobSnapshot.product_code,
-        storage_location: storageLocation,
-        filling_date: fillingDate,
-        special_notes: specialNotes,
-        expired_date: expiredDate,
-      }} />
+      {(() => {
+        const dCard = new Date(batch.startedAt || Date.now());
+        const ddmmyyCard = `${String(dCard.getDate()).padStart(2, '0')}${String(dCard.getMonth() + 1).padStart(2, '0')}${String(dCard.getFullYear()).slice(2)}`;
+        const computedBatchNo = (batch.batch_no || batch.id).replace(/^\d{6}/, ddmmyyCard);
+        return (
+          <PrintableTicket batch={{
+            batch_no: computedBatchNo,
+            job_name: batch.jobSnapshot.name,
+            operator: batch.operator,
+            line: batch.jobSnapshot.line,
+            start_time: new Date(batch.startedAt).toISOString(),
+            end_time: batch.completedAt ? new Date(batch.completedAt).toISOString() : undefined,
+            output_qty: output,
+            unit: batch.jobSnapshot.unit,
+            status: batch.status,
+            product_code: batch.jobSnapshot.product_code,
+            storage_location: storageLocation,
+            filling_date: fillingDate,
+            special_notes: specialNotes,
+            expired_date: expiredDate,
+          }} />
+        );
+      })()}
 
     </div>
   );

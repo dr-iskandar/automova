@@ -2264,7 +2264,11 @@ function BatchDetail({
       
       {printMode === "label" && (
         <PrintableTicket batch={{
-          batch_no: batch.batch_no || batch.id,
+          batch_no: (() => {
+            const d = new Date(batch.started_at);
+            const ddmmyy = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getFullYear()).slice(2)}`;
+            return (batch.batch_no || batch.id).replace(/^\d{6}/, ddmmyy);
+          })(),
           job_name: batch.job_name,
           operator: batch.operator_name,
           line: "Line N/A",
