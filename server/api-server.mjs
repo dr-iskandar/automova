@@ -159,6 +159,20 @@ ensureColumn("job_steps", "allow_overdrive", "INTEGER NOT NULL DEFAULT 1");
 ensureColumn("job_steps", "loop_warning", "INTEGER NOT NULL DEFAULT 1");
 
 try {
+  db.prepare(`
+    UPDATE batches 
+    SET cost_per_unit = ROUND(
+      CASE 
+        WHEN actual_material_cost > 0 THEN actual_material_cost / output
+        ELSE estimated_material_cost / output
+      END, 2)
+    WHERE output > 0 AND (cost_per_unit IS NULL OR cost_per_unit = 0)
+  `).run();
+} catch (err) {
+  console.error("Migration cost_per_unit error:", err);
+}
+
+try {
   db.exec(`
     UPDATE batches 
     SET line = COALESCE((SELECT line FROM jobs WHERE jobs.id = batches.job_id), '') 
@@ -1625,10 +1639,47 @@ const server = createServer(async (req, res) => {
           )
           .get(body.job_id)?.total || 0,
       );
+      const outputNum = Number(body.output || 0);
+      const actualCostNum = Number(body.actual_material_cost || 0);
+      const costPerUnitNum = Number(
+        body.cost_per_unit || (outputNum > 0 && actualCostNum > 0 ? actualCostNum / outputNum : (outputNum > 0 && estimatedMaterialCost > 0 ? estimatedMaterialCost / outputNum : 0))
+      );
       db.prepare(
         `INSERT INTO batches(id,job_id,job_name,job_version,operator_id,operator_name,status,current_step,started_at,completed_at,output,unit,planned_duration,actual_duration,pause_count,on_time,estimated_material_cost,actual_material_cost,cost_per_unit,batch_no,packaging_code,expired_date,storage_location,filling_date,special_notes,area,line)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(id) DO UPDATE SET job_id=excluded.job_id,job_name=excluded.job_name,job_version=excluded.job_version,operator_id=excluded.operator_id,operator_name=excluded.operator_name,status=excluded.status,current_step=excluded.current_step,completed_at=excluded.completed_at,output=excluded.output,unit=excluded.unit,planned_duration=excluded.planned_duration,actual_duration=excluded.actual_duration,pause_count=excluded.pause_count,on_time=excluded.on_time,batch_no=excluded.batch_no,packaging_code=excluded.packaging_code,expired_date=excluded.expired_date,storage_location=excluded.storage_location,filling_date=excluded.filling_date,special_notes=excluded.special_notes,area=excluded.area,line=excluded.line`,
+        ON CONFLICT(id) DO UPDATE SET 
+          job_id=excluded.job_id,
+          job_name=excluded.job_name,
+          job_version=excluded.job_version,
+          operator_id=excluded.operator_id,
+          operator_name=excluded.operator_name,
+          status=excluded.status,
+          current_step=excluded.current_step,
+          completed_at=excluded.completed_at,
+          output=excluded.output,
+          unit=excluded.unit,
+          planned_duration=excluded.planned_duration,
+          actual_duration=excluded.actual_duration,
+          pause_count=excluded.pause_count,
+          on_time=excluded.on_time,
+          estimated_material_cost=excluded.estimated_material_cost,
+          actual_material_cost=CASE WHEN excluded.actual_material_cost > 0 THEN excluded.actual_material_cost ELSE batches.actual_material_cost END,
+          cost_per_unit=CASE 
+            WHEN excluded.cost_per_unit > 0 THEN excluded.cost_per_unit 
+            WHEN excluded.output > 0 AND excluded.actual_material_cost > 0 THEN ROUND(excluded.actual_material_cost / excluded.output, 2)
+            WHEN excluded.output > 0 AND batches.actual_material_cost > 0 THEN ROUND(batches.actual_material_cost / excluded.output, 2)
+            WHEN excluded.output > 0 AND excluded.estimated_material_cost > 0 THEN ROUND(excluded.estimated_material_cost / excluded.output, 2)
+            WHEN excluded.output > 0 AND batches.estimated_material_cost > 0 THEN ROUND(batches.estimated_material_cost / excluded.output, 2)
+            ELSE batches.cost_per_unit 
+          END,
+          batch_no=excluded.batch_no,
+          packaging_code=excluded.packaging_code,
+          expired_date=excluded.expired_date,
+          storage_location=excluded.storage_location,
+          filling_date=excluded.filling_date,
+          special_notes=excluded.special_notes,
+          area=excluded.area,
+          line=excluded.line`,
       ).run(
         body.id,
         body.job_id || null,
@@ -1647,8 +1698,8 @@ const server = createServer(async (req, res) => {
         Number(body.pause_count || 0),
         body.on_time !== undefined ? (body.on_time ? 1 : 0) : 1,
         estimatedMaterialCost,
-        Number(body.actual_material_cost || 0),
-        Number(body.cost_per_unit || 0),
+        actualCostNum,
+        costPerUnitNum,
         body.batch_no || "",
         body.packaging_code || "",
         body.expired_date || "",
@@ -1911,6 +1962,19 @@ const server = createServer(async (req, res) => {
         body.on_time === undefined ? current.on_time : body.on_time ? 1 : 0,
         batchMatch[1],
       );
+      try {
+        db.prepare(`
+          UPDATE batches 
+          SET cost_per_unit = ROUND(
+            CASE 
+              WHEN actual_material_cost > 0 THEN actual_material_cost / output
+              ELSE estimated_material_cost / output
+            END, 2)
+          WHERE id = ? AND output > 0
+        `).run(batchMatch[1]);
+      } catch (e) {
+        // ignore
+      }
       db.prepare(
         "INSERT INTO batch_events(id,batch_id,event_time,event_type,title,detail,actor) VALUES(?,?,?,?,?,?,?)",
       ).run(

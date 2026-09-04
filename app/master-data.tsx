@@ -2239,7 +2239,17 @@ function BatchDetail({
               </div>
               <div>
                 <small>Biaya per {batch.unit}</small>
-                <strong>{formatRupiah(batch.cost_per_unit)}</strong>
+                <strong>
+                  {formatRupiah(
+                    batch.cost_per_unit && batch.cost_per_unit > 0
+                      ? batch.cost_per_unit
+                      : batch.output && batch.output > 0 && batch.actual_material_cost
+                      ? batch.actual_material_cost / batch.output
+                      : batch.output && batch.output > 0 && batch.estimated_material_cost
+                      ? batch.estimated_material_cost / batch.output
+                      : 0
+                  )}
+                </strong>
               </div>
             </>
           )}
@@ -4238,7 +4248,17 @@ export function ReportManager({
                             {item.variance_percent > 0 ? "+" : ""}{item.variance_percent}%
                           </span>
                         </td>
-                        <td>{formatRupiah(item.cost_per_unit)}</td>
+                        <td>
+                          {formatRupiah(
+                            item.cost_per_unit && item.cost_per_unit > 0
+                              ? item.cost_per_unit
+                              : item.output && item.output > 0 && item.actual_material_cost
+                              ? item.actual_material_cost / item.output
+                              : item.output && item.output > 0 && item.estimated_material_cost
+                              ? item.estimated_material_cost / item.output
+                              : 0
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
