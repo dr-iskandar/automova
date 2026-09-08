@@ -10,9 +10,10 @@ export function PrintableTicket({
     job_name: string;
     operator: string;
     line: string;
+    machine?: string;
     start_time: string;
     end_time?: string;
-    output_qty: number;
+    output_qty: number | string;
     unit: string;
     status: string;
     product_code?: string;
@@ -24,7 +25,8 @@ export function PrintableTicket({
 }) {
   if (!batch || typeof document === "undefined") return null;
 
-  const qrText = `Kode Drum: ${batch.product_code || "N/A"}\nBatch no: ${batch.batch_no}\nEstimasi Hasil: ${batch.output_qty} ${batch.unit}\nLokasi: ${batch.storage_location || "-"}\nFilling: ${batch.filling_date || "-"}\nExpired: ${batch.expired_date || "-"}\nCatatan: ${batch.special_notes || "-"}`;
+  const machineInfo = batch.machine || batch.line || "";
+  const qrText = `Kode Drum: ${batch.product_code || "N/A"}\nBatch no: ${batch.batch_no}\nMesin: ${machineInfo || "-"}\nEstimasi Hasil: ${batch.output_qty} ${batch.unit}\nLokasi: ${batch.storage_location || "-"}\nFilling: ${batch.filling_date || "-"}\nExpired: ${batch.expired_date || "-"}\nCatatan: ${batch.special_notes || "-"}`;
 
   return createPortal(
     <div className="printable-ticket" aria-hidden="true">
@@ -32,6 +34,11 @@ export function PrintableTicket({
         <div className="ticket-title-group">
           <h1>AUTOMOVA</h1>
           <h2>PRODUCTION ROUTING TICKET</h2>
+          {machineInfo && (
+            <div className="ticket-machine-box" style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", marginTop: "3px", letterSpacing: "0.5px" }}>
+              MESIN: {machineInfo}
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
           <QRCodeSVG

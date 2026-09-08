@@ -249,6 +249,7 @@ type Batch = {
   storage_location?: string;
   filling_date?: string;
   special_notes?: string;
+  machine?: string;
   actual_materials?: Record<string, number>;
   pausedRemainingSeconds?: number;
 };
@@ -3378,6 +3379,7 @@ function CompletionCard({
   const [fillingDate, setFillingDate] = useState(batch.filling_date || new Date().toISOString().slice(0, 10));
   const [specialNotes, setSpecialNotes] = useState(batch.special_notes || "");
   const [expiredDate, setExpiredDate] = useState(batch.expired_date || "");
+  const [machine, setMachine] = useState(batch.machine || batch.jobSnapshot.line || "");
   const [errors, setErrors] = useState<{
     output?: string;
     storageLocation?: string;
@@ -3429,6 +3431,7 @@ function CompletionCard({
       filling_date: fillingDate,
       expired_date: expiredDate,
       special_notes: specialNotes,
+      machine: machine,
     };
     setBatch(updatedBatch);
     persistBatch(updatedBatch);
@@ -3534,6 +3537,11 @@ function CompletionCard({
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <small>Mesin yang Digunakan</small>
+            <input type="text" style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} value={machine} onChange={e => setMachine(e.target.value)} placeholder="Contoh: Mixing Tank 01" />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <small>Catatan Khusus</small>
             <input type="text" style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border)' }} value={specialNotes} onChange={e => setSpecialNotes(e.target.value)} />
           </label>
@@ -3557,6 +3565,7 @@ function CompletionCard({
                   output={output || 0}
                   unit={batch.jobSnapshot.unit}
                   specialNotes={specialNotes || ""}
+                  machine={machine || ""}
                 />
                 <button
                   className="btn btn-primary btn-lg"
@@ -3603,6 +3612,7 @@ function CompletionCard({
             filling_date: fillingDate,
             special_notes: specialNotes,
             expired_date: expiredDate,
+            machine: machine,
           }} />
         );
       })()}

@@ -11,6 +11,7 @@ export function PrintableLabel({
   output,
   unit,
   specialNotes,
+  machine,
 }: {
   batchNo: string;
   productCode: string;
@@ -22,6 +23,7 @@ export function PrintableLabel({
   output: string | number;
   unit: string;
   specialNotes: string;
+  machine?: string;
 }) {
   return (
     <div className="print-label-container" style={{ display: 'none' }}>
@@ -36,6 +38,7 @@ export function PrintableLabel({
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold', width: '40%' }}>Product Code</td><td style={{ padding: '4px 0' }}>: {productCode}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Product Name</td><td style={{ padding: '4px 0' }}>: {productName}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Batch No</td><td style={{ padding: '4px 0', fontSize: '18px', fontWeight: 'bold' }}>: {batchNo}</td></tr>
+            {machine && <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Mesin</td><td style={{ padding: '4px 0' }}>: {machine}</td></tr>}
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Packaging</td><td style={{ padding: '4px 0' }}>: {packagingCode}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Output</td><td style={{ padding: '4px 0' }}>: {output} {unit}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Filling Date</td><td style={{ padding: '4px 0' }}>: {fillingDate}</td></tr>
