@@ -1,6 +1,6 @@
 export const apiBase = () => {
   if (typeof window === "undefined") return "http://127.0.0.1:3100/api";
-  return `${window.location.protocol}//${window.location.hostname}/api`;
+  return "/api";
 };
 
 export async function apiFetch<T>(
