@@ -3379,7 +3379,7 @@ function CompletionCard({
   const [fillingDate, setFillingDate] = useState(batch.filling_date || new Date().toISOString().slice(0, 10));
   const [specialNotes, setSpecialNotes] = useState(batch.special_notes || "");
   const [expiredDate, setExpiredDate] = useState(batch.expired_date || "");
-  const [machine, setMachine] = useState(batch.machine || batch.jobSnapshot.line || "");
+  const [machine, setMachine] = useState(batch.line || batch.machine || batch.jobSnapshot.line || "");
   const [errors, setErrors] = useState<{
     output?: string;
     storageLocation?: string;
