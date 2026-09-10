@@ -1616,6 +1616,85 @@ const server = createServer(async (req, res) => {
       });
     }
 
+    if (path === "/api/dashboard/output-detail" && req.method === "GET") {
+      const targetDate = url.searchParams.get("date");
+      let condition = "date(started_at, '+7 hours') BETWEEN date(?) AND date(?)";
+      let values = [];
+      let fromStr = "";
+      let toStr = "";
+
+      if (targetDate) {
+        fromStr = targetDate;
+        toStr = targetDate;
+        values = [targetDate, targetDate];
+      } else {
+        const dr = dateRange(url);
+        fromStr = dr.from;
+        toStr = dr.to;
+        values = [dr.from, dr.to];
+      }
+
+      const summary = db
+        .prepare(
+          `SELECT COUNT(*) AS total_batches,
+          COALESCE(SUM(CASE WHEN status='Completed' THEN output ELSE 0 END),0) AS total_output,
+          SUM(CASE WHEN status='Completed' THEN 1 ELSE 0 END) AS completed,
+          SUM(CASE WHEN status='Paused' THEN 1 ELSE 0 END) AS paused,
+          SUM(CASE WHEN status='Cancelled' THEN 1 ELSE 0 END) AS cancelled
+          FROM batches WHERE ${condition}`,
+        )
+        .get(...values);
+
+      const byProduct = db
+        .prepare(
+          `SELECT job_name, unit,
+          COUNT(*) AS count,
+          COALESCE(SUM(output),0) AS output
+          FROM batches
+          WHERE ${condition} AND status='Completed'
+          GROUP BY job_name, unit ORDER BY output DESC`,
+        )
+        .all(...values);
+
+      const byMachine = db
+        .prepare(
+          `SELECT COALESCE(NULLIF(line,''), 'N/A') AS machine,
+          COUNT(*) AS count,
+          COALESCE(SUM(output),0) AS output
+          FROM batches
+          WHERE ${condition} AND status='Completed'
+          GROUP BY line ORDER BY output DESC`,
+        )
+        .all(...values);
+
+      const batches = db
+        .prepare(
+          `SELECT id, batch_no, job_name, operator_name, area, line, output, unit, started_at, completed_at, status
+          FROM batches
+          WHERE ${condition} AND status='Completed'
+          ORDER BY completed_at DESC, started_at DESC`,
+        )
+        .all(...values);
+
+      return json(res, 200, {
+        data: {
+          date: targetDate || null,
+          from: fromStr,
+          to: toStr,
+          summary: {
+            ...summary,
+            avg_per_batch: summary.completed > 0 ? Math.round((summary.total_output / summary.completed) * 10) / 10 : 0,
+          },
+          by_product: byProduct.map((p) => ({
+            ...p,
+            percentage: summary.total_output > 0 ? Math.round((p.output / summary.total_output) * 1000) / 10 : 0,
+          })),
+          by_machine: byMachine,
+          batches,
+        },
+      });
+    }
+
     if (path === "/api/batches" && req.method === "GET") {
       const filter = batchWhere(url);
       return json(res, 200, {

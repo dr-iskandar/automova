@@ -2717,6 +2717,35 @@ type DashboardData = {
   }>;
 };
 
+type OutputDrilldownData = {
+  date: string | null;
+  from: string;
+  to: string;
+  summary: {
+    total_batches: number;
+    total_output: number;
+    completed: number;
+    paused: number;
+    cancelled: number;
+    avg_per_batch: number;
+  };
+  by_product: Array<{ job_name: string; unit: string; count: number; output: number; percentage: number }>;
+  by_machine: Array<{ machine: string; count: number; output: number }>;
+  batches: Array<{
+    id: string;
+    batch_no: string;
+    job_name: string;
+    operator_name: string;
+    area: string;
+    line: string;
+    output: number;
+    unit: string;
+    started_at: string;
+    completed_at: string;
+    status: string;
+  }>;
+};
+
 export function DynamicDashboard({
   role,
   notify,
@@ -2729,6 +2758,33 @@ export function DynamicDashboard({
   const [from, setFrom] = useState(() => offsetDate(-7));
   const [to, setTo] = useState(() => offsetDate(0));
   const [data, setData] = useState<DashboardData | null>(null);
+
+  const [outputDetailModalOpen, setOutputDetailModalOpen] = useState(false);
+  const [selectedDrilldownDate, setSelectedDrilldownDate] = useState<string | null>(null);
+  const [drilldownData, setDrilldownData] = useState<OutputDrilldownData | null>(null);
+  const [loadingDrilldown, setLoadingDrilldown] = useState(false);
+
+  const openOutputDrilldown = async (targetDate?: string) => {
+    setSelectedDrilldownDate(targetDate || null);
+    setOutputDetailModalOpen(true);
+    setLoadingDrilldown(true);
+    try {
+      const queryParams = new URLSearchParams();
+      if (targetDate) {
+        queryParams.set("date", targetDate);
+      } else {
+        queryParams.set("from", from);
+        queryParams.set("to", to);
+      }
+      const res = await apiFetch<{ data: OutputDrilldownData }>(`/dashboard/output-detail?${queryParams}`);
+      setDrilldownData(res.data);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Gagal memuat rincian output");
+    } finally {
+      setLoadingDrilldown(false);
+    }
+  };
+
   const load = useCallback(async () => {
     const response = await apiFetch<{ data: DashboardData }>(
       `/dashboard?${new URLSearchParams({ from, to })}`,
@@ -2793,16 +2849,33 @@ export function DynamicDashboard({
       />
       <div className="metric-grid">
         {metrics.map((metric) => (
-          <article className="metric-card" key={metric.label}>
+          <article
+            className="metric-card"
+            key={metric.label}
+            onClick={() => metric.label === "Total Output" && openOutputDrilldown()}
+            style={metric.label === "Total Output" ? { cursor: "pointer", position: "relative" } : undefined}
+          >
             <span className={`metric-icon ${metric.tone}`}>
               <i className={`bi ${metric.icon}`} />
             </span>
             <div>
               <small>{metric.label}</small>
               <strong>{metric.value}</strong>
-              <span>
-                {from} s/d {to}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
+                <span>
+                  {from} s/d {to}
+                </span>
+                {metric.label === "Total Output" && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    style={{ padding: "2px 8px", fontSize: "10px", fontWeight: 700, borderRadius: "4px" }}
+                    onClick={(e) => { e.stopPropagation(); openOutputDrilldown(); }}
+                  >
+                    <i className="bi bi-bar-chart-line" /> Lihat Rincian
+                  </button>
+                )}
+              </div>
             </div>
           </article>
         ))}
@@ -2812,7 +2885,7 @@ export function DynamicDashboard({
           <div className="panel-head">
             <div>
               <h2>Output per Hari</h2>
-              <p>Produksi completed pada periode terpilih</p>
+              <p>Klik pada batang grafik untuk melihat rincian output tanggal tersebut</p>
             </div>
             <span className="database-pill">
               <i className="bi bi-database-check" /> Live Database
@@ -2821,7 +2894,12 @@ export function DynamicDashboard({
           <div className="bar-chart">
             {data?.daily.length ? (
               data.daily.map((item) => (
-                <div key={item.day}>
+                <div
+                  key={item.day}
+                  onClick={() => openOutputDrilldown(item.day)}
+                  style={{ cursor: "pointer" }}
+                  title={`Klik untuk melihat rincian output ${Number(item.output).toLocaleString("id-ID")} L tanggal ${item.day}`}
+                >
                   <span
                     style={{
                       height: `${Math.max(8, (item.output / maximum) * 100)}%`,
@@ -2829,11 +2907,16 @@ export function DynamicDashboard({
                   >
                     <em>{Number(item.output).toLocaleString("id-ID")} L</em>
                   </span>
-                  <small>
-                    {new Date(`${item.day}T00:00:00`).toLocaleDateString(
-                      "id-ID",
-                      { day: "2-digit", month: "short" },
-                    )}
+                  <small style={{ marginTop: "4px", display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                    <strong>
+                      {new Date(`${item.day}T00:00:00`).toLocaleDateString(
+                        "id-ID",
+                        { day: "2-digit", month: "short" },
+                      )}
+                    </strong>
+                    <span className="badge bg-light text-primary" style={{ fontSize: "9px", padding: "1px 5px", border: "1px solid #bfdbfe" }}>
+                      Rincian <i className="bi bi-chevron-right" />
+                    </span>
                   </small>
                 </div>
               ))
@@ -2979,6 +3062,154 @@ export function DynamicDashboard({
           </div>
         </section>
       </div>
+
+      {/* OUTPUT DRILLDOWN ANALYTICS MODAL */}
+      {outputDetailModalOpen && (
+        <div className="modal-backdrop-custom" style={{ zIndex: 1100 }}>
+          <div className="override-modal" style={{ maxWidth: "840px", width: "95%", maxHeight: "90vh", overflowY: "auto" }}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setOutputDetailModalOpen(false)}
+              aria-label="Tutup"
+            >
+              <i className="bi bi-x-lg" />
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "1rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "1rem" }}>
+              <span style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg, #2563eb, #1d4ed8)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)" }}>
+                <i className="bi bi-bar-chart-line-fill" />
+              </span>
+              <div>
+                <p className="section-kicker" style={{ margin: 0 }}>ANALYTICS OUTPUT PRODUKSI</p>
+                <h2 style={{ margin: 0, fontSize: "20px" }}>
+                  {selectedDrilldownDate
+                    ? `Rincian Output Tanggal ${new Date(`${selectedDrilldownDate}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`
+                    : `Rincian Akumulasi Output (${from} s/d ${to})`}
+                </h2>
+              </div>
+            </div>
+
+            {loadingDrilldown ? (
+              <div style={{ textAlign: "center", padding: "3rem", color: "#6b7280" }}>
+                <i className="bi bi-arrow-repeat spin" style={{ fontSize: "32px", color: "#2563eb", display: "block", marginBottom: "1rem" }} />
+                Memuat rincian output...
+              </div>
+            ) : drilldownData ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Header Summary KPI */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1rem" }}>
+                  <div style={{ background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "1px solid #93c5fd", padding: "1rem", borderRadius: "12px" }}>
+                    <small style={{ color: "#1e40af", fontWeight: 700, fontSize: "11px", textTransform: "uppercase" }}>TOTAL OUTPUT</small>
+                    <strong style={{ display: "block", fontSize: "24px", color: "#1e3a8a", marginTop: "4px" }}>
+                      {Number(drilldownData.summary.total_output || 0).toLocaleString("id-ID")} L
+                    </strong>
+                  </div>
+                  <div style={{ background: "linear-gradient(135deg, #f0fdf4, #dcfce7)", border: "1px solid #86efac", padding: "1rem", borderRadius: "12px" }}>
+                    <small style={{ color: "#166534", fontWeight: 700, fontSize: "11px", textTransform: "uppercase" }}>BATCH COMPLETED</small>
+                    <strong style={{ display: "block", fontSize: "24px", color: "#14532d", marginTop: "4px" }}>
+                      {drilldownData.summary.completed} Batch
+                    </strong>
+                  </div>
+                  <div style={{ background: "linear-gradient(135deg, #faf5ff, #f3e8ff)", border: "1px solid #d8b4fe", padding: "1rem", borderRadius: "12px" }}>
+                    <small style={{ color: "#6b21a8", fontWeight: 700, fontSize: "11px", textTransform: "uppercase" }}>RATA-RATA / BATCH</small>
+                    <strong style={{ display: "block", fontSize: "24px", color: "#581c87", marginTop: "4px" }}>
+                      {drilldownData.summary.avg_per_batch} L
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Breakdown per Produk */}
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "1.25rem", borderRadius: "14px" }}>
+                  <h3 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 1rem 0", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <i className="bi bi-box-seam" style={{ color: "#2563eb" }} /> Breakdown Output per Produk / Job
+                  </h3>
+                  {drilldownData.by_product.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {drilldownData.by_product.map((prod, i) => (
+                        <div key={i} style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                            <strong style={{ color: "#1e293b" }}>{prod.job_name}</strong>
+                            <span style={{ color: "#2563eb", fontWeight: 700 }}>
+                              {Number(prod.output).toLocaleString("id-ID")} {prod.unit} ({prod.percentage}%)
+                            </span>
+                          </div>
+                          <div style={{ height: "10px", background: "#e2e8f0", borderRadius: "5px", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${Math.max(5, prod.percentage)}%`, background: "linear-gradient(90deg, #3b82f6, #1d4ed8)", borderRadius: "5px" }} />
+                          </div>
+                          <small style={{ color: "#64748b", fontSize: "11px" }}>Dihasilkan dari {prod.count} batch produksi completed</small>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: "#64748b", margin: 0, fontSize: "13px" }}>Tidak ada produk yang selesai pada periode ini.</p>
+                  )}
+                </div>
+
+                {/* Breakdown per Mesin */}
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "1.25rem", borderRadius: "14px" }}>
+                  <h3 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 1rem 0", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <i className="bi bi-cpu" style={{ color: "#10b981" }} /> Breakdown Output per Mesin / Line
+                  </h3>
+                  {drilldownData.by_machine.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+                      {drilldownData.by_machine.map((m, i) => (
+                        <div key={i} style={{ background: "#fff", border: "1px solid #cbd5e1", padding: "12px 14px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
+                          <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, display: "block" }}>{m.machine}</span>
+                          <strong style={{ fontSize: "18px", color: "#0f172a", display: "block", marginTop: "2px" }}>
+                            {Number(m.output).toLocaleString("id-ID")} L
+                          </strong>
+                          <small style={{ color: "#10b981", fontSize: "11px", fontWeight: 600 }}>{m.count} Batch Selesai</small>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: "#64748b", margin: 0, fontSize: "13px" }}>Tidak ada data mesin.</p>
+                  )}
+                </div>
+
+                {/* Tabel Transaksi Batch Completed */}
+                <div>
+                  <h3 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 0.75rem 0", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <i className="bi bi-card-checklist" style={{ color: "#6366f1" }} /> Daftar Rincian Batch ({drilldownData.batches.length})
+                  </h3>
+                  <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "10px" }}>
+                    <table style={{ width: "100%", fontSize: "12.5px", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ background: "#f1f5f9", textAlign: "left", color: "#475569" }}>
+                          <th style={{ padding: "10px 14px" }}>Batch No</th>
+                          <th style={{ padding: "10px 14px" }}>Nama Produk / Job</th>
+                          <th style={{ padding: "10px 14px" }}>Mesin</th>
+                          <th style={{ padding: "10px 14px" }}>Operator</th>
+                          <th style={{ padding: "10px 14px" }}>Hasil Output</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drilldownData.batches.length > 0 ? (
+                          drilldownData.batches.map((b) => (
+                            <tr key={b.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                              <td style={{ padding: "10px 14px", fontFamily: "monospace", fontWeight: 700 }}>{b.batch_no || b.id}</td>
+                              <td style={{ padding: "10px 14px", fontWeight: 600 }}>{b.job_name}</td>
+                              <td style={{ padding: "10px 14px" }}><span className="badge bg-light text-dark" style={{ border: "1px solid #cbd5e1" }}>{b.line || "-"}</span></td>
+                              <td style={{ padding: "10px 14px" }}>{b.operator_name}</td>
+                              <td style={{ padding: "10px 14px", color: "#16a34a", fontWeight: 700 }}>
+                                {Number(b.output || 0).toLocaleString("id-ID")} {b.unit}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} style={{ padding: "2rem", textAlign: "center", color: "#64748b" }}>Tidak ada batch pada periode ini.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
