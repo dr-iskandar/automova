@@ -471,6 +471,13 @@ export default function Home({
   const loginNoticeShown = useRef(false);
   const syncAttempted = useRef(false);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const batchRef = useRef<Batch | null>(null);
+  const lastLocalStepChangeRef = useRef<number>(0);
+  const isNavigatingStepRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    batchRef.current = batch;
+  }, [batch]);
 
   useEffect(() => {
     return () => {
@@ -641,8 +648,9 @@ export default function Home({
 
     const syncActiveBatch = async () => {
       try {
+        const curBatch = batchRef.current;
         // If current local batch is already completed, do not interrupt completion UI
-        if (batch && (batch.status === "Completed" || batch.stepState === "completed")) return;
+        if (curBatch && (curBatch.status === "Completed" || curBatch.stepState === "completed")) return;
 
         const params = new URLSearchParams({
           from: "2020-01-01",
@@ -660,9 +668,10 @@ export default function Home({
         ) : null;
 
         if (!activeRaw) {
+          const freshBatch = batchRef.current;
           // If local batch is completed, do not clear it
-          if (batch && (batch.status === "Completed" || batch.stepState === "completed")) return;
-          if (batch && Date.now() - batch.startedAt > 5000) {
+          if (freshBatch && (freshBatch.status === "Completed" || freshBatch.stepState === "completed")) return;
+          if (freshBatch && Date.now() - freshBatch.startedAt > 5000) {
             setBatch(null);
             setView("home");
             setToast("Pekerjaan aktif telah diselesaikan atau dibatalkan dari perangkat lain.");
@@ -675,8 +684,15 @@ export default function Home({
         );
         const serverBatch = detailRes.data;
 
-        // If local batch is ahead of server batch step index or already completed, don't revert
-        if (batch && batch.id === serverBatch.id && (batch.status === "Completed" || serverBatch.current_step < batch.currentStep)) {
+        const freshBatch = batchRef.current;
+        // If local step was changed recently (within 8 seconds) and server step is behind or equal, ignore server revert
+        if (
+          freshBatch &&
+          freshBatch.id === serverBatch.id &&
+          (freshBatch.status === "Completed" ||
+            freshBatch.stepState === "completed" ||
+            (Date.now() - lastLocalStepChangeRef.current < 8000 && serverBatch.current_step <= freshBatch.currentStep))
+        ) {
           return;
         }
 
@@ -715,62 +731,61 @@ export default function Home({
           const parsedRem = parseRemainingFromDetail(lastPauseEvent?.detail);
           if (parsedRem !== null) {
             pausedRemainingSeconds = parsedRem;
-          } else if (batch && batch.id === serverBatch.id && batch.pausedRemainingSeconds !== undefined && batch.pausedRemainingSeconds > 0) {
-            pausedRemainingSeconds = batch.pausedRemainingSeconds;
+          } else if (freshBatch && freshBatch.id === serverBatch.id && freshBatch.pausedRemainingSeconds !== undefined && freshBatch.pausedRemainingSeconds > 0) {
+            pausedRemainingSeconds = freshBatch.pausedRemainingSeconds;
           } else {
             pausedRemainingSeconds = (jobSnap.steps || [])[serverBatch.current_step]?.duration || 0;
           }
         } else if (serverBatch.status === "In Progress") {
-          // Search for step-specific start/resume event
-          const stepStartEvent = [...parsedEvents]
-            .reverse()
-            .find(
-              (e: any) =>
-                e.title.includes(`Step ${serverBatch.current_step + 1}`) ||
-                e.title.includes(`step ${serverBatch.current_step + 1}`) ||
-                e.title.includes("dimulai") ||
-                e.title.includes("dilanjutkan"),
-            );
+          // If local batch is currently running this step and timer has not expired, preserve local running state
+          if (
+            freshBatch &&
+            freshBatch.id === serverBatch.id &&
+            freshBatch.currentStep === serverBatch.current_step &&
+            freshBatch.stepState === "running" &&
+            freshBatch.stepEndsAt > Date.now()
+          ) {
+            stepState = "running";
+            stepEndsAt = freshBatch.stepEndsAt;
+          } else {
+            // Search for step-specific start/resume event
+            const stepStartEvent = [...parsedEvents]
+              .reverse()
+              .find(
+                (e: any) =>
+                  e.title.includes(`Step ${serverBatch.current_step + 1}`) ||
+                  e.title.includes(`step ${serverBatch.current_step + 1}`) ||
+                  e.title.includes("dimulai") ||
+                  e.title.includes("dilanjutkan"),
+              );
 
-          if (stepStartEvent && (jobSnap.steps || [])[serverBatch.current_step]) {
-            const parsedRem = parseRemainingFromDetail(stepStartEvent.detail);
-            const durationSec = parsedRem !== null 
-              ? parsedRem 
-              : ((jobSnap.steps || [])[serverBatch.current_step].duration || 0);
+            if (stepStartEvent && (jobSnap.steps || [])[serverBatch.current_step]) {
+              const parsedRem = parseRemainingFromDetail(stepStartEvent.detail);
+              const durationSec = parsedRem !== null 
+                ? parsedRem 
+                : ((jobSnap.steps || [])[serverBatch.current_step].duration || 0);
 
-            stepEndsAt = new Date(stepStartEvent.time).getTime() + durationSec * 1000;
-            if (stepEndsAt < Date.now()) {
-              stepState = "confirm";
+              stepEndsAt = new Date(stepStartEvent.time).getTime() + durationSec * 1000;
+              if (stepEndsAt < Date.now()) {
+                stepState = "confirm";
+              } else {
+                stepState = "running";
+              }
             } else {
               stepState = "running";
+              const durationSec = (jobSnap.steps || [])[serverBatch.current_step]?.duration || 0;
+              stepEndsAt = Date.now() + durationSec * 1000;
             }
-          } else {
-            stepState = "running";
-            const durationSec = (jobSnap.steps || [])[serverBatch.current_step]?.duration || 0;
-            stepEndsAt = Date.now() + durationSec * 1000;
           }
         }
 
-        // If local batch is actively running on the same batch & step, preserve local stepEndsAt to avoid tick drift
-        if (
-          batch &&
-          batch.id === serverBatch.id &&
-          batch.status === "In Progress" &&
-          batch.stepState === "running" &&
-          batch.currentStep === serverBatch.current_step &&
-          stepEndsAt > Date.now()
-        ) {
-          stepEndsAt = batch.stepEndsAt;
-        }
-
         // Compare if we need to update state
-        // Only update if batch ID, status, current step, or event count changed
         const isDifferent =
-          !batch ||
-          batch.id !== serverBatch.id ||
-          batch.status !== serverBatch.status ||
-          batch.currentStep !== serverBatch.current_step ||
-          batch.events.length !== parsedEvents.length;
+          !freshBatch ||
+          freshBatch.id !== serverBatch.id ||
+          freshBatch.status !== serverBatch.status ||
+          freshBatch.currentStep !== serverBatch.current_step ||
+          freshBatch.events.length !== parsedEvents.length;
 
         if (isDifferent) {
           const reconstructedBatch: Batch = {
@@ -783,7 +798,7 @@ export default function Home({
               : undefined,
             currentStep: serverBatch.current_step,
             stepState,
-            stepEndsAt: (batch && batch.id === serverBatch.id && batch.currentStep === serverBatch.current_step && batch.stepState === "running") ? batch.stepEndsAt : stepEndsAt,
+            stepEndsAt: (freshBatch && freshBatch.id === serverBatch.id && freshBatch.currentStep === serverBatch.current_step && freshBatch.stepState === "running") ? freshBatch.stepEndsAt : stepEndsAt,
             status: serverBatch.status as BatchStatus,
             notes: {},
             events: parsedEvents,
@@ -792,10 +807,10 @@ export default function Home({
           };
 
           setBatch(reconstructedBatch);
-          if (!batch) {
+          if (!freshBatch) {
             setView("active");
             setToast("Pekerjaan aktif dipulihkan dari server.");
-          } else if (batch.id !== serverBatch.id) {
+          } else if (freshBatch.id !== serverBatch.id) {
             setView("active");
             setToast("Pekerjaan aktif diperbarui dari server.");
           }
@@ -1309,6 +1324,11 @@ export default function Home({
 
   const markAction = () => {
     if (!batch || batch.stepState !== "running") return;
+    if (isNavigatingStepRef.current) return;
+    isNavigatingStepRef.current = true;
+    setTimeout(() => { isNavigatingStepRef.current = false; }, 1000);
+    lastLocalStepChangeRef.current = Date.now();
+
     stopActiveAudio();
     setBatch({
       ...batch,
@@ -1324,6 +1344,73 @@ export default function Home({
       ],
     });
     setSelectedMaterial("");
+  };
+
+  const handleOverdriveConfirm = () => {
+    if (!batch) return;
+    if (isNavigatingStepRef.current) return;
+    isNavigatingStepRef.current = true;
+    setTimeout(() => { isNavigatingStepRef.current = false; }, 1000);
+    lastLocalStepChangeRef.current = Date.now();
+
+    stopActiveAudio();
+    const isLast = batch.currentStep === (batch.jobSnapshot.steps || []).length - 1;
+    const notes = { ...batch.notes, [batch.currentStep]: note };
+    const step = (batch.jobSnapshot.steps || [])[batch.currentStep];
+    const stepInfo = step ? `Step ${batch.currentStep + 1}: ${step.title || ""} - Instruksi: ${step.instruction || ""}` : `Step ${batch.currentStep + 1}`;
+    if (isLast) {
+      const events = [
+        ...batch.events,
+        {
+          time: new Date().toISOString(),
+          title: `Step ${batch.currentStep + 1} selesai (Overdrive)`,
+          detail: `Operator melakukan overdrive pada step terakhir (${stepInfo}).`,
+          tone: "orange" as const,
+        },
+      ];
+      const nextBatch: Batch = {
+        ...batch,
+        stepState: "confirm",
+        stepEndsAt: Date.now(),
+        notes,
+        events,
+      };
+      setBatch(nextBatch);
+      persistBatch(nextBatch);
+    } else {
+      const next = batch.currentStep + 1;
+      const durationSec = (batch.jobSnapshot.steps || [])[next]?.duration || 0;
+      const nextStepInfo = (batch.jobSnapshot.steps || [])[next];
+      const events: BatchEvent[] = [
+        ...batch.events,
+        {
+          time: new Date().toISOString(),
+          title: `Step ${batch.currentStep + 1} selesai (Overdrive)`,
+          detail: `Operator melompati sisa waktu step (${stepInfo}).`,
+          tone: "orange" as const,
+        },
+        {
+          time: new Date().toISOString(),
+          title: `Step ${next + 1} dimulai`,
+          detail: nextStepInfo?.title || `Proses step ${next + 1}`,
+          tone: "blue" as const,
+        },
+      ];
+      const nextBatch: Batch = {
+        ...batch,
+        status: "In Progress",
+        currentStep: next,
+        stepState: "running",
+        stepEndsAt: Date.now() + durationSec * 1000,
+        pausedRemainingSeconds: undefined,
+        notes,
+        events,
+      };
+      setBatch(nextBatch);
+      persistBatch(nextBatch);
+      setNote("");
+      setToast(`Step ${next + 1} otomatis berjalan via Overdrive.`);
+    }
   };
   const confirmYes = (completionData?: {
     packagingCode: string;
@@ -1637,68 +1724,6 @@ export default function Home({
     setPin("");
     setReason("");
     setToast("Otorisasi berhasil. Step diselesaikan lebih awal.");
-  };
-
-  const handleOverdriveConfirm = () => {
-    if (!batch) return;
-    stopActiveAudio();
-    const isLast = batch.currentStep === (batch.jobSnapshot.steps || []).length - 1;
-    const notes = { ...batch.notes, [batch.currentStep]: note };
-    const step = (batch.jobSnapshot.steps || [])[batch.currentStep];
-    const stepInfo = step ? `Step ${batch.currentStep + 1}: ${step.title || ""} - Instruksi: ${step.instruction || ""}` : `Step ${batch.currentStep + 1}`;
-    if (isLast) {
-      const events = [
-        ...batch.events,
-        {
-          time: new Date().toISOString(),
-          title: `Step ${batch.currentStep + 1} selesai (Overdrive)`,
-          detail: `Operator melakukan overdrive pada step terakhir (${stepInfo}).`,
-          tone: "orange" as const,
-        },
-      ];
-      const nextBatch: Batch = {
-        ...batch,
-        stepState: "confirm",
-        stepEndsAt: Date.now(),
-        notes,
-        events,
-      };
-      setBatch(nextBatch);
-      persistBatch(nextBatch);
-    } else {
-      const next = batch.currentStep + 1;
-      const durationSec = (batch.jobSnapshot.steps || [])[next]?.duration || 0;
-      const nextStepInfo = (batch.jobSnapshot.steps || [])[next];
-      const events: BatchEvent[] = [
-        ...batch.events,
-        {
-          time: new Date().toISOString(),
-          title: `Step ${batch.currentStep + 1} selesai (Overdrive)`,
-          detail: `Operator melompati sisa waktu step (${stepInfo}).`,
-          tone: "orange" as const,
-        },
-        {
-          time: new Date().toISOString(),
-          title: `Step ${next + 1} dimulai`,
-          detail: nextStepInfo?.title || `Proses step ${next + 1}`,
-          tone: "blue" as const,
-        },
-      ];
-      const nextBatch: Batch = {
-        ...batch,
-        status: "In Progress",
-        currentStep: next,
-        stepState: "running",
-        stepEndsAt: Date.now() + durationSec * 1000,
-        pausedRemainingSeconds: undefined,
-        notes,
-        events,
-      };
-      setBatch(nextBatch);
-      persistBatch(nextBatch);
-      setNote("");
-      setToast(`Step ${next + 1} otomatis berjalan via Overdrive.`);
-    }
   };
 
   const adjustStepEndsAt = (remainingSec: number) => {

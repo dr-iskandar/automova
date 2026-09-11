@@ -2,6 +2,16 @@ import { QRCodeSVG } from "qrcode.react";
 import Barcode from "react-barcode";
 import { createPortal } from "react-dom";
 
+export function formatMachineName(name?: string): string {
+  if (!name) return "";
+  const trimmed = name.trim();
+  const match = trimmed.match(/^(?:Line|Mesin)\s*(\d+)$/i);
+  if (match) {
+    return `M${match[1]}`;
+  }
+  return trimmed;
+}
+
 export function PrintableTicket({
   batch,
 }: {
@@ -25,7 +35,8 @@ export function PrintableTicket({
 }) {
   if (!batch || typeof document === "undefined") return null;
 
-  const machineInfo = batch.machine || batch.line || "";
+  const rawMachine = batch.machine || batch.line || "";
+  const machineInfo = formatMachineName(rawMachine);
   const qrText = `Kode Drum: ${batch.product_code || "N/A"}\nBatch no: ${batch.batch_no}\nMesin: ${machineInfo || "-"}\nEstimasi Hasil: ${batch.output_qty} ${batch.unit}\nLokasi: ${batch.storage_location || "-"}\nFilling: ${batch.filling_date || "-"}\nExpired: ${batch.expired_date || "-"}\nCatatan: ${batch.special_notes || "-"}`;
 
   return createPortal(

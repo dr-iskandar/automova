@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatMachineName } from './printable-ticket';
 
 export function PrintableLabel({
   batchNo,
@@ -25,6 +26,7 @@ export function PrintableLabel({
   specialNotes: string;
   machine?: string;
 }) {
+  const formattedMachine = formatMachineName(machine);
   return (
     <div className="print-label-container" style={{ display: 'none' }}>
       <div className="print-label-content" style={{ padding: '20px', border: '2px solid #000', width: '10cm', height: '10cm', boxSizing: 'border-box', fontFamily: 'sans-serif' }}>
@@ -38,7 +40,7 @@ export function PrintableLabel({
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold', width: '40%' }}>Product Code</td><td style={{ padding: '4px 0' }}>: {productCode}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Product Name</td><td style={{ padding: '4px 0' }}>: {productName}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Batch No</td><td style={{ padding: '4px 0', fontSize: '18px', fontWeight: 'bold' }}>: {batchNo}</td></tr>
-            {machine && <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Mesin</td><td style={{ padding: '4px 0' }}>: {machine}</td></tr>}
+            {formattedMachine && <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Mesin</td><td style={{ padding: '4px 0' }}>: {formattedMachine}</td></tr>}
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Packaging</td><td style={{ padding: '4px 0' }}>: {packagingCode}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Output</td><td style={{ padding: '4px 0' }}>: {output} {unit}</td></tr>
             <tr><td style={{ padding: '4px 0', fontWeight: 'bold' }}>Filling Date</td><td style={{ padding: '4px 0' }}>: {fillingDate}</td></tr>
