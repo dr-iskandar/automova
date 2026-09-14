@@ -1886,44 +1886,7 @@ export default function Home({
           lowStockCount={lowStockItems.length}
           onOpenLowStockAlert={() => setShowLowStockModal(true)}
         />
-        {!databaseOnline && (
-          <div style={{
-            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-            color: '#ffffff',
-            padding: '10px 20px',
-            fontSize: '13px',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
-            zIndex: 999
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <i className="bi bi-wifi-off" style={{ fontSize: '18px' }} />
-              <span>Perangkat terputus dari PC Server (192.168.100.75). Periksa koneksi Wi-Fi tablet.</span>
-            </div>
-            <button
-              onClick={() => setShowNetModal(true)}
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: '1px solid rgba(255,255,255,0.5)',
-                color: '#fff',
-                padding: '5px 14px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <i className="bi bi-activity" /> Buka Log Monitoring
-            </button>
-          </div>
-        )}
+        {/* Red banner removed per user request */}
         <div className="page-content">
           {isAdmin ? (
             <AdminContent
