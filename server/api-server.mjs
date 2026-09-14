@@ -2032,7 +2032,7 @@ const server = createServer(async (req, res) => {
         .get(batchMatch[1]);
       if (!current) return json(res, 404, { error: "Batch tidak ditemukan" });
       db.prepare(
-        "UPDATE batches SET status=?,output=?,unit=?,completed_at=?,actual_duration=?,on_time=? WHERE id=?",
+        "UPDATE batches SET status=?,output=?,unit=?,completed_at=?,actual_duration=?,on_time=?,line=?,area=? WHERE id=?",
       ).run(
         body.status || current.status,
         body.output ?? current.output,
@@ -2040,6 +2040,8 @@ const server = createServer(async (req, res) => {
         body.completed_at ?? current.completed_at,
         Number(body.actual_duration ?? current.actual_duration),
         body.on_time === undefined ? current.on_time : body.on_time ? 1 : 0,
+        body.line !== undefined ? body.line : current.line,
+        body.area !== undefined ? body.area : current.area,
         batchMatch[1],
       );
       try {

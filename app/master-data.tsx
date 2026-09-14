@@ -1831,6 +1831,7 @@ export function DatabaseBatchHistory({
         status: editing.status,
         output: editing.output,
         unit: editing.unit,
+        line: editing.line,
         completed_at: editing.completed_at,
         actual_duration: editing.actual_duration,
         notes: "Koreksi data melalui form Batch History",
@@ -2066,6 +2067,17 @@ export function DatabaseBatchHistory({
                       : null,
                   })
                 }
+              />
+            </label>
+            <label>
+              Line / Mesin
+              <input
+                type="text"
+                value={editing.line || ""}
+                onChange={(event) =>
+                  setEditing({ ...editing, line: event.target.value })
+                }
+                placeholder="Contoh: Line 2 atau Mesin 2"
               />
             </label>
             <label>
