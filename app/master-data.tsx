@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "./api";
-import { PrintableTicket } from "./printable-ticket";
+import { PrintableTicket, formatMachineName } from "./printable-ticket";
 
 export const checkAdminPriceAccess = (authUser?: any, role?: string) => {
   if (role === "admin") return true;
