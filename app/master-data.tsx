@@ -1953,9 +1953,9 @@ export function DatabaseBatchHistory({
                         borderRadius: "4px",
                         padding: "2px 6px",
                         fontSize: "11px",
-                        fontWeight: 500
+                        fontWeight: 600
                       }}>
-                        {item.line || "-"}
+                        {formatMachineName(item.line) || "-"}
                       </span>
                     </td>
                     <td>
@@ -2224,8 +2224,8 @@ function BatchDetail({
             <strong>{batch.area || "-"}</strong>
           </div>
           <div>
-            <small>Line</small>
-            <strong>{batch.line || "-"}</strong>
+            <small>Line / Mesin</small>
+            <strong>{formatMachineName(batch.line) || "-"}</strong>
           </div>
           {isSuperUser && (
             <>
