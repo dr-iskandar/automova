@@ -925,29 +925,13 @@ export default function Home({
     const startTime = performance.now();
     const timeStr = new Date().toLocaleTimeString("id-ID");
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${apiBase()}/health`, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      await apiFetch<{ ok: boolean }>("/health");
       const rtt = Math.round(performance.now() - startTime);
-
-      if (res.ok) {
-        setServerLatency(rtt);
-        setLastHealthCheck(timeStr);
-        setDatabaseOnline((prev) => {
-          if (!prev) {
-            setNetLogs((logs) => [
-              { time: timeStr, status: "ok", message: `Server terhubung kembali (${rtt}ms)`, latency: rtt },
-              ...logs.slice(0, 49),
-            ]);
-          }
-          return true;
-        });
-      } else {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      setServerLatency(rtt);
+      setLastHealthCheck(timeStr);
+      setDatabaseOnline(true);
     } catch (err: any) {
-      const errMsg = err?.name === "AbortError" ? "Timeout (3s)" : (err?.message || "Koneksi terputus");
+      const errMsg = err?.message || "Koneksi terputus";
       setServerLatency(null);
       setLastHealthCheck(timeStr);
       setDatabaseOnline((prev) => {
@@ -2296,20 +2280,17 @@ function Topbar({
         <img src={role === "operator" ? "/movacorp-logo-white.png" : "/movacorp-logo.png"} alt="Movacorp Logo" style={{ height: "38px", objectFit: "contain" }} />
       </div>
       <div className="topbar-context">
-        <button
-          type="button"
-          onClick={onOpenNetLogs}
-          className={`connection-pill ${databaseOnline ? "" : "offline"}`}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 10px', font: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          title="Klik untuk membuka Diagnostik Monitoring Koneksi Network"
-        >
-          <span />{" "}
-          {databaseOnline ? (
-            <>LAN Connected {serverLatency !== null ? `(${serverLatency}ms)` : ""}</>
-          ) : (
-            <>⚠️ Server Terputus (Offline)</>
-          )}
-        </button>
+        {databaseOnline && (
+          <button
+            type="button"
+            onClick={onOpenNetLogs}
+            className="connection-pill"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 10px', font: 'inherit', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            title="Klik untuk membuka Diagnostik Monitoring Koneksi Network"
+          >
+            <span /> LAN Connected {serverLatency !== null ? `(${serverLatency}ms)` : ""}
+          </button>
+        )}
       </div>
       <div className="topbar-actions">
         {(role === "admin" || role === "supervisor") && (
