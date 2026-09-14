@@ -2,9 +2,17 @@ import { QRCodeSVG } from "qrcode.react";
 import Barcode from "react-barcode";
 import { createPortal } from "react-dom";
 
-export function formatMachineName(name?: string): string {
+export function formatMachineName(name?: string, masterLines?: Array<{ name: string; code?: string }>): string {
   if (!name) return "";
   const trimmed = name.trim();
+  if (masterLines && masterLines.length > 0) {
+    const found = masterLines.find(
+      (l) => l.name.toLowerCase() === trimmed.toLowerCase() || l.code?.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (found && found.code && found.code.trim() !== "") {
+      return found.code.trim();
+    }
+  }
   const match = trimmed.match(/^(?:Line|Mesin)\s*(\d+)$/i);
   if (match) {
     return `M${match[1]}`;
@@ -14,6 +22,7 @@ export function formatMachineName(name?: string): string {
 
 export function PrintableTicket({
   batch,
+  masterLines,
 }: {
   batch: {
     batch_no: string;
@@ -32,11 +41,12 @@ export function PrintableTicket({
     expired_date?: string;
     special_notes?: string;
   } | null;
+  masterLines?: Array<{ name: string; code?: string }>;
 }) {
   if (!batch || typeof document === "undefined") return null;
 
   const rawMachine = batch.machine || batch.line || "";
-  const machineInfo = formatMachineName(rawMachine);
+  const machineInfo = formatMachineName(rawMachine, masterLines);
   const qrText = `Kode Drum: ${batch.product_code || "N/A"}\nBatch no: ${batch.batch_no}\nMesin: ${machineInfo || "-"}\nEstimasi Hasil: ${batch.output_qty} ${batch.unit}\nLokasi: ${batch.storage_location || "-"}\nFilling: ${batch.filling_date || "-"}\nExpired: ${batch.expired_date || "-"}\nCatatan: ${batch.special_notes || "-"}`;
 
   return createPortal(

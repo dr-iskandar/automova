@@ -3591,6 +3591,7 @@ function CompletionCard({
                   unit={batch.jobSnapshot.unit}
                   specialNotes={specialNotes || ""}
                   machine={machine || ""}
+                  masterLines={masterLines}
                 />
                 <button
                   className="btn btn-primary btn-lg"
@@ -3622,7 +3623,7 @@ function CompletionCard({
         const ddmmyyCard = `${String(dCard.getDate()).padStart(2, '0')}${String(dCard.getMonth() + 1).padStart(2, '0')}${String(dCard.getFullYear()).slice(2)}`;
         const computedBatchNo = (batch.batch_no || batch.id).replace(/^\d{6}/, ddmmyyCard);
         return (
-          <PrintableTicket batch={{
+          <PrintableTicket masterLines={masterLines} batch={{
             batch_no: computedBatchNo,
             job_name: batch.jobSnapshot.name,
             operator: batch.operator,

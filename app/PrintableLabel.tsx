@@ -13,6 +13,7 @@ export function PrintableLabel({
   unit,
   specialNotes,
   machine,
+  masterLines,
 }: {
   batchNo: string;
   productCode: string;
@@ -25,8 +26,9 @@ export function PrintableLabel({
   unit: string;
   specialNotes: string;
   machine?: string;
+  masterLines?: Array<{ name: string; code?: string }>;
 }) {
-  const formattedMachine = formatMachineName(machine);
+  const formattedMachine = formatMachineName(machine, masterLines);
   return (
     <div className="print-label-container" style={{ display: 'none' }}>
       <div className="print-label-content" style={{ padding: '20px', border: '2px solid #000', width: '10cm', height: '10cm', boxSizing: 'border-box', fontFamily: 'sans-serif' }}>

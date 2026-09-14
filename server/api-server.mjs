@@ -127,6 +127,7 @@ ensureColumn("materials", "unit_price", "REAL NOT NULL DEFAULT 0");
 ensureColumn("materials", "currency", "TEXT NOT NULL DEFAULT 'IDR'");
 ensureColumn("materials", "min_sku", "REAL NOT NULL DEFAULT 0");
 ensureColumn("master_packaging", "min_sku", "REAL NOT NULL DEFAULT 0");
+ensureColumn("master_lines", "code", "TEXT NOT NULL DEFAULT ''");
 ensureColumn(
   "batches",
   "estimated_material_cost",
@@ -801,8 +802,8 @@ const server = createServer(async (req, res) => {
         const body = await readBody(req);
         const id = body.id || randomUUID();
         if (table === "master_lines") {
-          db.prepare(`INSERT INTO ${table}(id, name, area_id, status) VALUES(?,?,?,?)`)
-            .run(id, body.name, body.area_id || null, body.status || "Active");
+          db.prepare(`INSERT INTO ${table}(id, name, code, area_id, status) VALUES(?,?,?,?,?)`)
+            .run(id, body.name, body.code || "", body.area_id || null, body.status || "Active");
         } else if (table === "master_packaging") {
           db.prepare(`INSERT INTO ${table}(id, code, name, default_qty, unit, unit_price, currency, status, notes, min_sku) VALUES(?,?,?,?,?,?,?,?,?,?)`)
             .run(id, body.code || "", body.name, Number(body.default_qty || 0), body.unit || "Pcs", Number(body.unit_price || 0), body.currency || "IDR", body.status || "Active", body.notes || "", Number(body.min_sku || 0));
@@ -821,8 +822,8 @@ const server = createServer(async (req, res) => {
       if (idParam && req.method === "PUT") {
         const body = await readBody(req);
         if (table === "master_lines") {
-          db.prepare(`UPDATE ${table} SET name=?, area_id=?, status=? WHERE id=?`)
-            .run(body.name, body.area_id || null, body.status || "Active", idParam);
+          db.prepare(`UPDATE ${table} SET name=?, code=?, area_id=?, status=? WHERE id=?`)
+            .run(body.name, body.code || "", body.area_id || null, body.status || "Active", idParam);
         } else if (table === "master_packaging") {
           db.prepare(`UPDATE ${table} SET code=?, name=?, default_qty=?, unit=?, unit_price=?, currency=?, status=?, notes=?, min_sku=? WHERE id=?`)
             .run(body.code || "", body.name, Number(body.default_qty || 0), body.unit || "Pcs", Number(body.unit_price || 0), body.currency || "IDR", body.status || "Active", body.notes || "", Number(body.min_sku || 0), idParam);

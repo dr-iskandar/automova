@@ -4970,6 +4970,7 @@ export function GenericMasterList({
             <tr>
               {hasCode && <th>Kode</th>}
               <th>Nama {title}</th>
+              {hasAreaId && <th>Kode/Singkatan Label</th>}
               {hasAreaId && <th>Area</th>}
               <th>Status</th>
               <th style={{ width: "100px", textAlign: "right" }}>Aksi</th>
@@ -4980,6 +4981,7 @@ export function GenericMasterList({
               <tr key={it.id}>
                 {hasCode && <td style={{ fontWeight: 600 }}>{it.code}</td>}
                 <td style={{ fontWeight: 500 }}>{it.name}</td>
+                {hasAreaId && <td><strong style={{ color: "var(--blue)" }}>{it.code || "-"}</strong></td>}
                 {hasAreaId && <td>{areas.find(a => a.id === it.area_id)?.name || it.area_id || "-"}</td>}
                 <td>
                   <span className={`status-badge status-${it.status.toLowerCase()}`}>
@@ -4998,7 +5000,7 @@ export function GenericMasterList({
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={hasAreaId ? 4 : 3} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
+                <td colSpan={hasAreaId ? 5 : 3} style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
                   Belum ada data.
                 </td>
               </tr>
@@ -5035,6 +5037,17 @@ export function GenericMasterList({
                 required
               />
             </label>
+            {hasAreaId && (
+              <label className="full-field">
+                Kode/Singkatan Label (Opsional)
+                <input
+                  type="text"
+                  placeholder="Contoh: M1, M2, FL, LB (Default: M1 jika Line 1)"
+                  value={editing.code || ""}
+                  onChange={(e) => setEditing({ ...editing, code: e.target.value })}
+                />
+              </label>
+            )}
             {hasAreaId && (
               <label className="full-field">
                 Area Produksi
