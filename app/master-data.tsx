@@ -1792,13 +1792,18 @@ export function DatabaseBatchHistory({
   const [cancelling, setCancelling] = useState<BatchRow | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [status, setStatus] = useState("");
-  const [from, setFrom] = useState(() => offsetDate(-7));
-  const [to, setTo] = useState(() => offsetDate(0));
+  const [masterLines, setMasterLines] = useState<Array<{ name: string; code?: string }>>([]);
   const load = useCallback(async () => {
     const params = new URLSearchParams({ from, to });
     if (status) params.set("status", status);
-    const response = await apiFetch<{ data: BatchRow[] }>(`/batches?${params}`);
+    const [response, linesRes] = await Promise.all([
+      apiFetch<{ data: BatchRow[] }>(`/batches?${params}`),
+      apiFetch<{ data: Array<{ name: string; code?: string }> }>("/master_lines").catch(() => ({ data: [] }))
+    ]);
     setItems(response.data);
+    if (linesRes && linesRes.data) {
+      setMasterLines(linesRes.data);
+    }
   }, [from, status, to]);
   useEffect(() => {
     queueMicrotask(() => void load().catch((error) => notify(error.message)));
@@ -1956,7 +1961,7 @@ export function DatabaseBatchHistory({
                         fontSize: "11px",
                         fontWeight: 600
                       }}>
-                        {formatMachineName(item.line) || "-"}
+                        {formatMachineName(item.line, masterLines) || "-"}
                       </span>
                     </td>
                     <td>
@@ -2018,6 +2023,7 @@ export function DatabaseBatchHistory({
         />
       </section>
       <PrintableTicket
+        masterLines={masterLines}
         batch={detail ? {
           batch_no: detail.id,
           job_name: detail.job_name,
@@ -2030,7 +2036,7 @@ export function DatabaseBatchHistory({
           status: detail.status,
         } : null}
       />
-      {detail && <BatchDetail batch={detail} onClose={() => setDetail(null)} isSuperUser={isSuperUser} />}
+      {detail && <BatchDetail batch={detail} onClose={() => setDetail(null)} isSuperUser={isSuperUser} masterLines={masterLines} />}
       {editing && (
         <EntityModal
           title={`Edit ${editing.id}`}
@@ -2165,10 +2171,12 @@ function BatchDetail({
   batch,
   onClose,
   isSuperUser = false,
+  masterLines = [],
 }: {
   batch: BatchRow;
   onClose: () => void;
   isSuperUser?: boolean;
+  masterLines?: Array<{ name: string; code?: string }>;
 }) {
   const [printMode, setPrintMode] = useState<"label" | null>(null);
 
@@ -2293,6 +2301,13 @@ function BatchDetail({
             <p className="empty-timeline">Belum ada event tersimpan.</p>
           )}
         </div>
+
+        {batch.notes && (
+          <div className="batch-detail-notes">
+            <h3>Catatan</h3>
+            <p>{batch.notes}</p>
+          </div>
+        )}
         <div className="batch-detail-actions">
           <button className="btn btn-primary" onClick={onClose}>
             Tutup
@@ -2301,7 +2316,7 @@ function BatchDetail({
       </section>
       
       {printMode === "label" && (
-        <PrintableTicket batch={{
+        <PrintableTicket masterLines={masterLines} batch={{
           batch_no: (() => {
             const d = new Date(batch.started_at);
             const ddmmyy = `${String(d.getDate()).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getFullYear()).slice(2)}`;
