@@ -2891,6 +2891,7 @@ function ActiveBatch({
   setView,
   overdrivePausedRemaining,
   setOverdrivePausedRemaining,
+  masterLines = [],
 }: {
   batch: Batch | null;
   now: number;
@@ -2973,7 +2974,7 @@ function ActiveBatch({
   const elapsedTotal = totalDuration - remainingTotal;
   const timeProgressPercent = totalDuration > 0 ? Math.min(100, Math.max(0, (elapsedTotal / totalDuration) * 100)) : 0;
   if (batch.status === "Completed")
-    return <CompletionCard batch={batch} setView={setView} persistBatch={persistBatch} setBatch={setBatch} masterLines={props.masterLines} />;
+    return <CompletionCard batch={batch} setView={setView} persistBatch={persistBatch} setBatch={setBatch} masterLines={masterLines} />;
   return (
     <div className="active-page operator-container">
       {batch.jobSnapshot.popupEnabled && (batch.jobSnapshot.popupTitle || batch.jobSnapshot.popupMessage) && (
