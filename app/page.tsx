@@ -2559,9 +2559,10 @@ function OperatorContent(props: {
         overdrivePausedRemaining={overdrivePausedRemaining}
         setOverdrivePausedRemaining={setOverdrivePausedRemaining}
         setView={setView}
+        masterLines={masterLines}
       />
     );
-  if (view === "history") return <OperatorHistory history={history} jobs={jobs} />;
+  if (view === "history") return <OperatorHistory history={history} jobs={jobs} masterLines={masterLines} />;
   if (view === "account")
     return (
       <AccountCard
@@ -2914,6 +2915,7 @@ function ActiveBatch({
   setView: (view: View) => void;
   overdrivePausedRemaining: number | null;
   setOverdrivePausedRemaining: (v: number | null) => void;
+  masterLines?: Array<{ id: string; name: string; area_id: string; code?: string }>;
 }) {
   const [packagingCode, setPackagingCode] = useState("");
   const [expiredDate, setExpiredDate] = useState("");
@@ -2971,7 +2973,7 @@ function ActiveBatch({
   const elapsedTotal = totalDuration - remainingTotal;
   const timeProgressPercent = totalDuration > 0 ? Math.min(100, Math.max(0, (elapsedTotal / totalDuration) * 100)) : 0;
   if (batch.status === "Completed")
-    return <CompletionCard batch={batch} setView={setView} persistBatch={persistBatch} setBatch={setBatch} />;
+    return <CompletionCard batch={batch} setView={setView} persistBatch={persistBatch} setBatch={setBatch} masterLines={props.masterLines} />;
   return (
     <div className="active-page operator-container">
       {batch.jobSnapshot.popupEnabled && (batch.jobSnapshot.popupTitle || batch.jobSnapshot.popupMessage) && (
@@ -3336,11 +3338,13 @@ function CompletionCard({
   setView,
   persistBatch,
   setBatch,
+  masterLines = [],
 }: {
   batch: Batch;
   setView: (view: View) => void;
   persistBatch: (value: Batch) => void;
   setBatch: (value: Batch | null) => void;
+  masterLines?: Array<{ id: string; name: string; area_id: string; code?: string }>;
 }) {
   const [output, setOutput] = useState(batch.output !== undefined && batch.output !== null ? String(batch.output) : "0");
   const [unit, setUnit] = useState(batch.jobSnapshot.unit || "Liter");
@@ -3591,7 +3595,7 @@ function CompletionCard({
   );
 }
 
-function OperatorHistory({ history, jobs }: { history: HistoryRow[]; jobs: Job[] }) {
+function OperatorHistory({ history, jobs, masterLines = [] }: { history: HistoryRow[]; jobs: Job[]; masterLines?: Array<{ id: string; name: string; area_id: string; code?: string }> }) {
   const [printBatch, setPrintBatch] = useState<any>(null);
 
   return (
@@ -3669,7 +3673,7 @@ function OperatorHistory({ history, jobs }: { history: HistoryRow[]; jobs: Job[]
         ))}
       </div>
       {printBatch && (
-        <PrintableTicket batch={{
+        <PrintableTicket masterLines={masterLines} batch={{
           batch_no: printBatch.batch_no || printBatch.id,
           job_name: printBatch.job_name,
           operator: printBatch.operator_name,
