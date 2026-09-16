@@ -1792,6 +1792,8 @@ export function DatabaseBatchHistory({
   const [cancelling, setCancelling] = useState<BatchRow | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [status, setStatus] = useState("");
+  const [from, setFrom] = useState(() => offsetDate(-7));
+  const [to, setTo] = useState(() => offsetDate(0));
   const [masterLines, setMasterLines] = useState<Array<{ name: string; code?: string }>>([]);
   const load = useCallback(async () => {
     const params = new URLSearchParams({ from, to });
