@@ -2791,7 +2791,7 @@ export function DynamicDashboard({
   const [outputDetailModalOpen, setOutputDetailModalOpen] = useState(false);
   const [selectedDrilldownDate, setSelectedDrilldownDate] = useState<string | null>(null);
   const [drilldownData, setDrilldownData] = useState<OutputDrilldownData | null>(null);
-  const [loadingDrilldown, setLoadingDrilldown] = useState(false);
+  const [masterLines, setMasterLines] = useState<Array<{ name: string; code?: string }>>([]);
 
   const openOutputDrilldown = async (targetDate?: string) => {
     setSelectedDrilldownDate(targetDate || null);
@@ -2805,8 +2805,14 @@ export function DynamicDashboard({
         queryParams.set("from", from);
         queryParams.set("to", to);
       }
-      const res = await apiFetch<{ data: OutputDrilldownData }>(`/dashboard/output-detail?${queryParams}`);
+      const [res, linesRes] = await Promise.all([
+        apiFetch<{ data: OutputDrilldownData }>(`/dashboard/output-detail?${queryParams}`),
+        apiFetch<{ data: Array<{ name: string; code?: string }> }>("/master_lines").catch(() => ({ data: [] }))
+      ]);
       setDrilldownData(res.data);
+      if (linesRes && linesRes.data) {
+        setMasterLines(linesRes.data);
+      }
     } catch (err) {
       notify(err instanceof Error ? err.message : "Gagal memuat rincian output");
     } finally {
@@ -3183,7 +3189,7 @@ export function DynamicDashboard({
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
                       {drilldownData.by_machine.map((m, i) => (
                         <div key={i} style={{ background: "#fff", border: "1px solid #cbd5e1", padding: "12px 14px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                          <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, display: "block" }}>{m.machine}</span>
+                          <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, display: "block" }}>{formatMachineName(m.machine, masterLines)}</span>
                           <strong style={{ fontSize: "18px", color: "#0f172a", display: "block", marginTop: "2px" }}>
                             {Number(m.output).toLocaleString("id-ID")} L
                           </strong>
@@ -3218,7 +3224,7 @@ export function DynamicDashboard({
                             <tr key={b.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                               <td style={{ padding: "10px 14px", fontFamily: "monospace", fontWeight: 700 }}>{b.batch_no || b.id}</td>
                               <td style={{ padding: "10px 14px", fontWeight: 600 }}>{b.job_name}</td>
-                              <td style={{ padding: "10px 14px" }}><span className="badge bg-light text-dark" style={{ border: "1px solid #cbd5e1" }}>{b.line || "-"}</span></td>
+                              <td style={{ padding: "10px 14px" }}><span className="badge bg-light text-dark" style={{ border: "1px solid #cbd5e1" }}>{formatMachineName(b.line, masterLines) || "-"}</span></td>
                               <td style={{ padding: "10px 14px" }}>{b.operator_name}</td>
                               <td style={{ padding: "10px 14px", color: "#16a34a", fontWeight: 700 }}>
                                 {Number(b.output || 0).toLocaleString("id-ID")} {b.unit}
