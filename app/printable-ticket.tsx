@@ -13,9 +13,11 @@ export function formatMachineName(name?: string, masterLines?: Array<{ name: str
       return found.code.trim();
     }
   }
-  const match = trimmed.match(/^(?:Line|Mesin)\s*(\d+)$/i);
-  if (match) {
-    return `M${match[1]}`;
+  // If named like "Mesin M2" or "Mesin 2"
+  const mMatch = trimmed.match(/^(?:Mesin|Line)\s*(M?\d+.*)$/i);
+  if (mMatch) {
+    const val = mMatch[1].trim();
+    return /^\d+$/.test(val) ? `M${val}` : val;
   }
   return trimmed;
 }

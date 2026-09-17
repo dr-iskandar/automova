@@ -2840,7 +2840,9 @@ function OperatorHome({
                     return areaObj ? l.area_id === areaObj.id : true;
                   })
                   .map((l) => (
-                    <option key={l.id} value={l.name}>{l.name}</option>
+                    <option key={l.id} value={l.name}>
+                      {l.code && l.code.trim() ? l.code.trim() : l.name}
+                    </option>
                   ))}
               </select>
             </label>
