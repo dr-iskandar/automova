@@ -18,6 +18,33 @@ export const checkAdminPriceAccess = (authUser?: any, role?: string) => {
   );
 };
 
+export const csvCell = (val: unknown): string => {
+  if (val === null || val === undefined) return '""';
+  const str = String(val).replace(/"/g, '""');
+  return `"${str}"`;
+};
+
+export const exportToCsv = (
+  filename: string,
+  headers: string[],
+  rows: (string | number | boolean | null | undefined)[][]
+) => {
+  const content = [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) => row.map(csvCell).join(","))
+  ].join("\r\n");
+
+  const blob = new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename.endsWith(".csv") ? filename : `${filename}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
 type TutorialStep = { title: string; text: string; icon: string };
 
 const TUTORIALS: Record<
@@ -509,10 +536,39 @@ export function MaterialMaster({
       .includes(query.toLowerCase()),
   );
 
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => (a.code || "").localeCompare(b.code || "", undefined, { numeric: true, sensitivity: "base" }));
+  }, [filtered]);
+
+  const exportData = () => {
+    const headers = [
+      "Kode Material",
+      "Nama Material",
+      "Stok Saat Ini",
+      "Minimal Stock (SKU)",
+      "Satuan",
+      "Harga Satuan (IDR)",
+      "Status",
+      "Catatan",
+    ];
+    const rows = sorted.map((item) => [
+      item.code,
+      item.name,
+      (item as any).initial_stock ?? 0,
+      item.min_sku ?? 0,
+      item.unit,
+      item.unit_price,
+      item.status,
+      item.notes || "",
+    ]);
+    exportToCsv(`master-bahan-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    notify("Export Master Bahan / Material berhasil didownload.");
+  };
+
   const paginated = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, currentPage, pageSize]);
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, currentPage, pageSize]);
 
   return (
     <div className="admin-page">
@@ -522,6 +578,9 @@ export function MaterialMaster({
         text="Kelola kode, satuan, harga bahan, dan histori perubahan biaya."
         actions={
           <>
+            <button className="btn btn-outline-primary" onClick={exportData} title="Export data ke Excel/CSV">
+              <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+            </button>
             <button className="btn btn-primary" onClick={() => setForm(empty)}>
               <i className="bi bi-plus-lg" /> Tambah Material
             </button>
@@ -544,10 +603,15 @@ export function MaterialMaster({
               placeholder="Cari kode atau nama bahan..."
             />
           </div>
-          <span className="database-pill">
-            <i className="bi bi-database-check" /> Database Terhubung ·{" "}
-            {items.length} bahan
-          </span>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button className="btn btn-sm btn-outline-primary" onClick={exportData}>
+              <i className="bi bi-download" /> Export XLS
+            </button>
+            <span className="database-pill">
+              <i className="bi bi-database-check" /> Database Terhubung ·{" "}
+              {items.length} bahan
+            </span>
+          </div>
         </div>
         <div className="responsive-table">
           <table>
@@ -901,10 +965,34 @@ export function UserMaster({ notify }: { notify: (message: string) => void }) {
       .includes(query.toLowerCase()),
   );
 
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) =>
+      (a.employee_no || a.username || a.name || "").localeCompare(
+        b.employee_no || b.username || b.name || "",
+        undefined,
+        { numeric: true, sensitivity: "base" }
+      )
+    );
+  }, [filtered]);
+
+  const exportData = () => {
+    const headers = ["NIP / No Pegawai", "Nama User", "Username", "Role", "Shift", "Status"];
+    const rows = sorted.map((u) => [
+      u.employee_no || "-",
+      u.name,
+      u.username,
+      u.role_name || u.role_id,
+      u.shift || "-",
+      u.status || "Active",
+    ]);
+    exportToCsv(`master-user-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    notify("Export Master User berhasil didownload.");
+  };
+
   const paginated = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, currentPage, pageSize]);
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, currentPage, pageSize]);
 
   return (
     <div className="admin-page">
@@ -914,6 +1002,9 @@ export function UserMaster({ notify }: { notify: (message: string) => void }) {
         text="Tambah operator, admin, supervisor, dan viewer beserta role masing-masing."
         actions={
           <>
+            <button className="btn btn-outline-primary" onClick={exportData} title="Export data ke Excel/CSV">
+              <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+            </button>
             <button className="btn btn-primary" onClick={() => setForm(empty)}>
               <i className="bi bi-person-plus" /> Tambah User
             </button>
@@ -1246,6 +1337,22 @@ export function AccessMaster({
       ),
     [permissions],
   );
+  const exportData = () => {
+    const headers = ["ID Role", "Nama Role", "Deskripsi", "Total Permission", "Daftar Permission"];
+    const sortedRoles = [...roles].sort((a, b) =>
+      (a.id || a.name || "").localeCompare(b.id || b.name || "", undefined, { numeric: true, sensitivity: "base" })
+    );
+    const rows = sortedRoles.map((r) => [
+      r.id,
+      r.name,
+      r.description || "-",
+      (r.permissions || []).length,
+      (r.permissions || []).join("; "),
+    ]);
+    exportToCsv(`master-hak-akses-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    notify("Export Master Hak Akses berhasil didownload.");
+  };
+
   return (
     <div className="admin-page">
       <MasterHeader
@@ -1254,6 +1361,9 @@ export function AccessMaster({
         text="Atur permission menu dan aksi untuk masing-masing role."
         actions={
           <>
+            <button className="btn btn-outline-primary" onClick={exportData} title="Export data ke Excel/CSV">
+              <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+            </button>
             <button
               className="btn btn-primary"
               onClick={() => setShowAdd(true)}
@@ -1867,10 +1977,59 @@ export function DatabaseBatchHistory({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) =>
+      (a.id || "").localeCompare(b.id || "", undefined, { numeric: true, sensitivity: "base" })
+    );
+  }, [filtered]);
+
+  const exportData = () => {
+    const headers = [
+      "Nomor Batch",
+      "Nama Job",
+      "Kode Produk",
+      "Operator",
+      "Area",
+      "Line Produksi",
+      "Shift",
+      "Target Output",
+      "Output Realisasi",
+      "Good Output",
+      "Reject Output",
+      "Satuan",
+      "Status Batch",
+      "Waktu Mulai",
+      "Waktu Selesai",
+      "Durasi (Menit)",
+      "Catatan / Reason",
+    ];
+    const rows = sorted.map((b) => [
+      b.id,
+      b.job_name,
+      (b as any).product_code || "-",
+      b.operator_name,
+      b.area || "-",
+      b.line || "-",
+      (b as any).shift || "-",
+      (b as any).target_qty || 0,
+      b.output || 0,
+      (b as any).good_qty || b.output || 0,
+      (b as any).reject_qty || 0,
+      b.unit || "Liter",
+      b.status,
+      b.started_at ? new Date(b.started_at).toLocaleString("id-ID") : "-",
+      b.completed_at ? new Date(b.completed_at).toLocaleString("id-ID") : "-",
+      b.actual_duration || 0,
+      (b as any).notes || (b as any).cancel_reason || "-",
+    ]);
+    exportToCsv(`histori-batch-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    notify("Export Histori Batch berhasil didownload.");
+  };
+
   const paginated = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, currentPage, pageSize]);
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, currentPage, pageSize]);
 
   return (
     <div className="admin-page">
@@ -1879,13 +2038,18 @@ export function DatabaseBatchHistory({
         title="Batch History"
         text="Klik batch untuk melihat version snapshot, output, durasi, dan timeline aktivitas."
         actions={
-          <DateRange
-            from={from}
-            to={to}
-            setFrom={setFrom}
-            setTo={setTo}
-            onApply={() => void load()}
-          />
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button className="btn btn-outline-primary" onClick={exportData} title="Export Histori Batch ke Excel/CSV">
+              <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+            </button>
+            <DateRange
+              from={from}
+              to={to}
+              setFrom={setFrom}
+              setTo={setTo}
+              onApply={() => void load()}
+            />
+          </div>
         }
       />
       <section className="panel table-panel">
@@ -2888,8 +3052,7 @@ export function DynamicDashboard({
           <article
             className="metric-card"
             key={metric.label}
-            onClick={() => metric.label === "Total Output" && openOutputDrilldown()}
-            style={metric.label === "Total Output" ? { cursor: "pointer", position: "relative" } : undefined}
+            style={{ position: "relative" }}
           >
             <span className={`metric-icon ${metric.tone}`}>
               <i className={`bi ${metric.icon}`} />
@@ -2897,18 +3060,48 @@ export function DynamicDashboard({
             <div>
               <small>{metric.label}</small>
               <strong>{metric.value}</strong>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
-                <span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", marginTop: "4px" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                   {from} s/d {to}
                 </span>
                 {metric.label === "Total Output" && (
                   <button
                     type="button"
                     className="btn btn-sm btn-outline-primary"
-                    style={{ padding: "2px 8px", fontSize: "10px", fontWeight: 700, borderRadius: "4px" }}
-                    onClick={(e) => { e.stopPropagation(); openOutputDrilldown(); }}
+                    style={{ padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px" }}
+                    onClick={() => openOutputDrilldown()}
                   >
                     <i className="bi bi-bar-chart-line" /> Lihat Rincian
+                  </button>
+                )}
+                {metric.label === "Total Batch" && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-success"
+                    style={{ padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px" }}
+                    onClick={() => onNavigate("history")}
+                  >
+                    <i className="bi bi-clock-history" /> Lihat Batch
+                  </button>
+                )}
+                {metric.label === "Completion Rate" && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-info"
+                    style={{ padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px" }}
+                    onClick={() => openOutputDrilldown()}
+                  >
+                    <i className="bi bi-pie-chart" /> Detail Rate
+                  </button>
+                )}
+                {metric.label === "Perlu Perhatian" && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-warning"
+                    style={{ padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px" }}
+                    onClick={() => onNavigate("history")}
+                  >
+                    <i className="bi bi-exclamation-octagon" /> Periksa Batch
                   </button>
                 )}
               </div>
@@ -3374,6 +3567,35 @@ export function MaterialLedger({
   };
   const [pageSize, setPageSize] = useState(10);
 
+  const exportData = () => {
+    const headers = [
+      "Waktu Transaksi",
+      "Kode Material",
+      "Nama Material",
+      "Jenis Pergerakan",
+      "Jumlah Qty",
+      "Satuan",
+      "Nomor Batch / Referensi",
+      "Keperluan / Purpose",
+      "Catatan",
+      "Pencatat / User",
+    ];
+    const rows = items.map((m) => [
+      m.occurred_at ? new Date(m.occurred_at).toLocaleString("id-ID") : "-",
+      m.material_code || "-",
+      m.material_name || "-",
+      m.movement_type,
+      m.qty,
+      m.unit,
+      m.reference || m.batch_id || "-",
+      m.purpose || "-",
+      m.notes || "-",
+      m.actor || "-",
+    ]);
+    exportToCsv(`ledger-penggunaan-material-${from}-sd-${to}.csv`, headers, rows);
+    notify("Export Penggunaan Material (Stok Opname) berhasil didownload.");
+  };
+
   const paginated = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return items.slice(start, start + pageSize);
@@ -3387,6 +3609,9 @@ export function MaterialLedger({
         text="Catat material masuk, pemakaian, penyesuaian, waktu, referensi, serta tujuan penggunaannya."
         actions={
           <>
+            <button className="btn btn-outline-primary" onClick={exportData} title="Export Ledger Penggunaan Material ke Excel/CSV">
+              <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+            </button>
             <TutorialButton tutorialKey="ledger" />
             <button
               className="btn btn-primary"
@@ -4776,9 +5001,6 @@ const toLocalDateTime = (value: string | null) => {
   return local.toISOString().slice(0, 16);
 };
 
-const csvCell = (value: unknown) =>
-  `"${String(value ?? "").replaceAll('"', '""')}"`;
-
 const movementLabel = (type: MaterialMovement["movement_type"]) =>
   ({
     IN: "Material Masuk",
@@ -4982,12 +5204,37 @@ export function GenericMasterList({
     }
   };
 
+  const exportData = () => {
+    const headers = [
+      "Kode",
+      `Nama ${title}`,
+      ...(hasAreaId ? ["Area"] : []),
+      "Status"
+    ];
+    const sortedItems = [...items].sort((a, b) =>
+      (a.code || a.name || "").localeCompare(b.code || b.name || "", undefined, { numeric: true, sensitivity: "base" })
+    );
+    const rows = sortedItems.map((it) => [
+      it.code || "-",
+      it.name,
+      ...(hasAreaId ? [areas.find((a) => a.id === it.area_id)?.name || it.area_id || "-"] : []),
+      it.status || "Active",
+    ]);
+    exportToCsv(`master-${title.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    notify(`Export Master ${title} berhasil didownload.`);
+  };
+
   return (
     <div className="admin-page">
       <MasterHeader
         kicker="DATA OPERASIONAL"
         title={`Master ${title}`}
         text={`Kelola data referensi ${title.toLowerCase()} untuk digunakan pada Job dan Ledger.`}
+        actions={
+          <button className="btn btn-outline-primary" onClick={exportData} title="Export data ke Excel/CSV">
+            <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+          </button>
+        }
       />
       <section className="panel table-panel slide-up">
       <div className="panel-head">
@@ -4995,9 +5242,14 @@ export function GenericMasterList({
           <h2>Daftar {title}</h2>
           <p>Kelola data master {title.toLowerCase()} untuk operasional.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setEditing({ name: "", code: "", status: "Active", area_id: "" })}>
-          <i className="bi bi-plus-lg" /> Tambah Data
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button className="btn btn-outline-primary" onClick={exportData}>
+            <i className="bi bi-download" /> Export XLS
+          </button>
+          <button className="btn btn-primary" onClick={() => setEditing({ name: "", code: "", status: "Active", area_id: "" })}>
+            <i className="bi bi-plus-lg" /> Tambah Data
+          </button>
+        </div>
       </div>
 
       <div className="responsive-table">
@@ -5013,7 +5265,9 @@ export function GenericMasterList({
             </tr>
           </thead>
           <tbody>
-            {items.map((it) => (
+            {[...items]
+              .sort((a, b) => ((a.code || a.name || "")).localeCompare(b.code || b.name || "", undefined, { numeric: true, sensitivity: "base" }))
+              .map((it) => (
               <tr key={it.id}>
                 {hasCode && <td style={{ fontWeight: 600 }}>{it.code}</td>}
                 <td style={{ fontWeight: 500 }}>{it.name}</td>
@@ -5249,6 +5503,35 @@ export function PackagingLedger({
   };
   const [pageSize, setPageSize] = useState(10);
 
+  const exportData = () => {
+    const headers = [
+      "Waktu Transaksi",
+      "Kode Kemasan",
+      "Nama Kemasan",
+      "Jenis Pergerakan",
+      "Jumlah Qty",
+      "Satuan",
+      "Nomor Batch / Referensi",
+      "Keperluan / Purpose",
+      "Catatan",
+      "Pencatat / User",
+    ];
+    const rows = items.map((p) => [
+      p.occurred_at ? new Date(p.occurred_at).toLocaleString("id-ID") : "-",
+      p.packaging_code || "-",
+      p.packaging_name || "-",
+      p.movement_type,
+      p.qty,
+      p.unit,
+      p.reference || p.batch_id || "-",
+      p.purpose || "-",
+      p.notes || "-",
+      p.actor || "-",
+    ]);
+    exportToCsv(`ledger-penggunaan-kemasan-${from}-sd-${to}.csv`, headers, rows);
+    notify("Export Penggunaan Kemasan (Stok Opname) berhasil didownload.");
+  };
+
   const paginated = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return items.slice(start, start + pageSize);
@@ -5262,6 +5545,9 @@ export function PackagingLedger({
         text="Catat packaging masuk, pemakaian, penyesuaian, waktu, referensi, serta tujuan penggunaannya."
         actions={
           <>
+            <button className="btn btn-outline-primary" onClick={exportData} title="Export Ledger Penggunaan Kemasan ke Excel/CSV">
+              <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+            </button>
             <TutorialButton tutorialKey="ledger" />
             <button
               className="btn btn-primary"
@@ -5676,10 +5962,39 @@ export function PackagingMaster({
       .includes(query.toLowerCase()),
   );
 
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => (a.code || "").localeCompare(b.code || "", undefined, { numeric: true, sensitivity: "base" }));
+  }, [filtered]);
+
+  const exportData = () => {
+    const headers = [
+      "Kode Kemasan",
+      "Nama Kemasan",
+      "Stok Saat Ini",
+      "Minimal Stock (SKU)",
+      "Satuan",
+      "Harga Satuan (IDR)",
+      "Status",
+      "Catatan",
+    ];
+    const rows = sorted.map((item) => [
+      item.code,
+      item.name,
+      (item as any).initial_stock ?? 0,
+      item.min_sku ?? 0,
+      item.unit,
+      item.unit_price,
+      item.status,
+      item.notes || "",
+    ]);
+    exportToCsv(`master-kemasan-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    notify("Export Master Kemasan / Packaging berhasil didownload.");
+  };
+
   const paginated = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, currentPage, pageSize]);
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, currentPage, pageSize]);
 
   return (
     <div className="admin-page">
@@ -5689,6 +6004,9 @@ export function PackagingMaster({
         text="Kelola kode, satuan, harga kemasan, dan histori perukemasan biaya."
         actions={
           <>
+            <button className="btn btn-outline-primary" onClick={exportData} title="Export data ke Excel/CSV">
+              <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+            </button>
             <button className="btn btn-primary" onClick={() => setForm(empty)}>
               <i className="bi bi-plus-lg" /> Tambah Packaging
             </button>
@@ -5711,10 +6029,15 @@ export function PackagingMaster({
               placeholder="Cari kode atau nama kemasan..."
             />
           </div>
-          <span className="database-pill">
-            <i className="bi bi-database-check" /> Database Terhubung ·{" "}
-            {items.length} kemasan
-          </span>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button className="btn btn-sm btn-outline-primary" onClick={exportData}>
+              <i className="bi bi-download" /> Export XLS
+            </button>
+            <span className="database-pill">
+              <i className="bi bi-database-check" /> Database Terhubung ·{" "}
+              {items.length} kemasan
+            </span>
+          </div>
         </div>
         <div className="responsive-table">
           <table>

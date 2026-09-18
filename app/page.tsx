@@ -19,6 +19,7 @@ import {
   UserMaster,
   GenericMasterList,
   checkAdminPriceAccess,
+  exportToCsv,
 } from "./master-data";
 import { PrintableTicket } from "./printable-ticket";
 
@@ -4505,10 +4506,75 @@ function JobManagement({
       jobs.filter((item) =>
         item.name.toLowerCase().includes(jobSearch.toLowerCase()) ||
         item.product.toLowerCase().includes(jobSearch.toLowerCase()) ||
+        (item.product_code || "").toLowerCase().includes(jobSearch.toLowerCase()) ||
         item.status.toLowerCase().includes(jobSearch.toLowerCase()),
       ),
     [jobs, jobSearch],
   );
+
+  const sortedJobs = useMemo(
+    () =>
+      [...filteredJobs].sort((a, b) =>
+        (a.product_code || a.product || a.name || "").localeCompare(
+          b.product_code || b.product || b.name || "",
+          undefined,
+          { numeric: true, sensitivity: "base" }
+        )
+      ),
+    [filteredJobs]
+  );
+
+  const exportJobData = () => {
+    const headers = [
+      "Kode Produk",
+      "Nama Job / Produk",
+      "Target Output",
+      "Satuan",
+      "Area ID",
+      "Line ID",
+      "Versi",
+      "Jumlah Langkah",
+      "Detail Langkah SOP",
+      "Komposisi Bahan (Material)",
+      "Komposisi Kemasan (Packaging)",
+      "Status",
+      "Update Terakhir",
+    ];
+    const rows = sortedJobs.map((job) => {
+      const stepsText = (job.steps || [])
+        .map(
+          (s, idx) =>
+            `Step ${idx + 1}: ${s.name || s.title} (${s.timer_sec ? Math.round(s.timer_sec / 60) + " mnt" : "tanpa timer"}) - ${s.instruction || ""}${s.warning ? " [Warning: " + s.warning + "]" : ""}`
+        )
+        .join(" | ");
+
+      const materialsText = (job.materials || [])
+        .map((m) => `${m.material_code || m.name} (${m.qty} ${m.unit})`)
+        .join("; ");
+
+      const packagingsText = ((job as any).packagings || [])
+        .map((p: any) => `${p.packaging_code || p.name} (${p.qty} ${p.unit})`)
+        .join("; ");
+
+      return [
+        job.product_code || "-",
+        job.name,
+        job.target,
+        job.unit,
+        job.area_id || "-",
+        job.line_id || "-",
+        job.version || "1.0",
+        job.steps?.length || 0,
+        stepsText || "-",
+        materialsText || "-",
+        packagingsText || "-",
+        job.status,
+        job.updated || "-",
+      ];
+    });
+    exportToCsv(`master-instruksi-kerja-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    setToast("Export Master Instruksi Kerja (Job Library) berhasil didownload.");
+  };
   
   const jobIndexFromId = (id: string) => jobs.findIndex((j) => j.id === id);
   
@@ -5585,10 +5651,13 @@ const addPackaging = () => {
           <p>Kelola instruksi kerja, komposisi bahan, dan parameter operasional.</p>
         </div>
         <div className="header-actions">
+          <button className="btn btn-outline-primary" onClick={exportJobData} title="Export Master Instruksi Kerja ke Excel/CSV">
+            <i className="bi bi-file-earmark-excel" /> Export XLS/CSV
+          </button>
           <TutorialButton tutorialKey="jobs" />
           <div className="jm-search-box">
             <i className="bi bi-search" />
-            <input value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} placeholder="Cari instruksi kerja..." />
+            <input value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} placeholder="Cari kode atau nama instruksi kerja..." />
           </div>
           <button className="btn btn-primary" onClick={addJob} style={{ padding: "0.6rem 1.25rem", gap: "0.5rem" }}>
             <i className="bi bi-plus-lg" /> Buat Job Baru
@@ -5614,7 +5683,7 @@ const addPackaging = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredJobs.length === 0 ? (
+              {sortedJobs.length === 0 ? (
                 <tr>
                   <td colSpan={10} style={{ textAlign: "center", padding: "4rem", color: "var(--muted)" }}>
                     <i className="bi bi-journal-x" style={{ fontSize: 36, display: "block", marginBottom: 12, opacity: 0.5 }} />
@@ -5622,11 +5691,11 @@ const addPackaging = () => {
                   </td>
                 </tr>
               ) : (
-                filteredJobs.map((item) => {
+                sortedJobs.map((item, sortedIdx) => {
                   const idx = jobIndexFromId(item.id);
                   return (
                     <tr key={item.id} className="jm-table-row" onClick={() => openEditModal(idx)} style={{ cursor: "pointer" }}>
-                      <td style={{ textAlign: "center", color: "var(--muted)", fontWeight: 600 }}>{idx + 1}</td>
+                      <td style={{ textAlign: "center", color: "var(--muted)", fontWeight: 600 }}>{sortedIdx + 1}</td>
                       <td>
                         <div className="jm-job-name-cell">
                           <span className="jm-job-icon"><i className="bi bi-card-checklist" /></span>
