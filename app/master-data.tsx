@@ -2791,6 +2791,7 @@ export function DynamicDashboard({
   const [outputDetailModalOpen, setOutputDetailModalOpen] = useState(false);
   const [selectedDrilldownDate, setSelectedDrilldownDate] = useState<string | null>(null);
   const [drilldownData, setDrilldownData] = useState<OutputDrilldownData | null>(null);
+  const [loadingDrilldown, setLoadingDrilldown] = useState(false);
   const [masterLines, setMasterLines] = useState<Array<{ name: string; code?: string }>>([]);
 
   const openOutputDrilldown = async (targetDate?: string) => {
