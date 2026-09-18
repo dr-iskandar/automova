@@ -77,6 +77,29 @@ setInterval(() => {
   performBackup("scheduled_6h");
 }, 6 * 60 * 60 * 1000);
 
+function normalizeMachineName(raw, masterLines = []) {
+  if (!raw) return "N/A";
+  const trimmed = String(raw).trim();
+  if (!trimmed) return "N/A";
+
+  if (masterLines && masterLines.length > 0) {
+    const found = masterLines.find(
+      (l) => l.name?.toLowerCase() === trimmed.toLowerCase() || (l.code && l.code.toLowerCase() === trimmed.toLowerCase())
+    );
+    if (found && found.code && found.code.trim() !== "") {
+      return found.code.trim().toUpperCase();
+    }
+  }
+
+  const mMatch = trimmed.match(/(?:Mesin|Line)?\s*(?:[\d-]+[\s-/\(]*)?(M\d+|M?\d+)/i);
+  if (mMatch && mMatch[1]) {
+    const val = mMatch[1].trim().toUpperCase();
+    return val.startsWith("M") ? val : `M${val}`;
+  }
+
+  return trimmed.toUpperCase();
+}
+
 // Initial startup backup will be called after schema creation
 const schema = [
   `CREATE TABLE IF NOT EXISTS roles (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '', is_system INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
@@ -1584,17 +1607,49 @@ const server = createServer(async (req, res) => {
           GROUP BY jm.name,jm.unit ORDER BY qty DESC LIMIT 5`,
         )
         .all(...values);
-      const machines = db
+      const masterLines = db.prepare("SELECT name, code FROM master_lines").all();
+      const rawMachines = db
         .prepare(
-          `SELECT line AS machine,
-          COUNT(*) AS total_batches,
-          SUM(CASE WHEN status='Completed' THEN 1 ELSE 0 END) AS completed,
-          COALESCE(SUM(CASE WHEN status='Completed' THEN output ELSE 0 END),0) AS output,
-          COALESCE(ROUND(AVG(CASE WHEN status='Completed' THEN actual_duration END)),0) AS avg_duration
-          FROM batches WHERE ${condition} AND line != ''
-          GROUP BY line ORDER BY total_batches DESC`,
+          `SELECT line AS machine, status, output, actual_duration
+          FROM batches WHERE ${condition} AND line != ''`
         )
         .all(...values);
+
+      const machineMap = new Map();
+      for (const row of rawMachines) {
+        const normCode = normalizeMachineName(row.machine, masterLines);
+        if (!machineMap.has(normCode)) {
+          machineMap.set(normCode, {
+            machine: normCode,
+            total_batches: 0,
+            completed: 0,
+            output: 0,
+            total_duration: 0,
+            duration_count: 0,
+          });
+        }
+        const entry = machineMap.get(normCode);
+        entry.total_batches += 1;
+        if (row.status === "Completed") {
+          entry.completed += 1;
+          entry.output += Number(row.output || 0);
+          if (row.actual_duration) {
+            entry.total_duration += Number(row.actual_duration);
+            entry.duration_count += 1;
+          }
+        }
+      }
+
+      const machines = Array.from(machineMap.values())
+        .map((m) => ({
+          machine: m.machine,
+          total_batches: m.total_batches,
+          completed: m.completed,
+          output: m.output,
+          avg_duration: m.duration_count > 0 ? Math.round(m.total_duration / m.duration_count) : 0,
+        }))
+        .sort((a, b) => b.total_batches - a.total_batches);
+
       return json(res, 200, {
         data: {
           from,
@@ -1657,16 +1712,27 @@ const server = createServer(async (req, res) => {
         )
         .all(...values);
 
-      const byMachine = db
+      const masterLines = db.prepare("SELECT name, code FROM master_lines").all();
+      const rawByMachine = db
         .prepare(
-          `SELECT COALESCE(NULLIF(line,''), 'N/A') AS machine,
-          COUNT(*) AS count,
-          COALESCE(SUM(output),0) AS output
+          `SELECT COALESCE(NULLIF(line,''), 'N/A') AS machine, output
           FROM batches
-          WHERE ${condition} AND status='Completed'
-          GROUP BY line ORDER BY output DESC`,
+          WHERE ${condition} AND status='Completed'`,
         )
         .all(...values);
+
+      const machineMapDetail = new Map();
+      for (const row of rawByMachine) {
+        const normCode = normalizeMachineName(row.machine, masterLines);
+        if (!machineMapDetail.has(normCode)) {
+          machineMapDetail.set(normCode, { machine: normCode, count: 0, output: 0 });
+        }
+        const entry = machineMapDetail.get(normCode);
+        entry.count += 1;
+        entry.output += Number(row.output || 0);
+      }
+
+      const byMachine = Array.from(machineMapDetail.values()).sort((a, b) => b.output - a.output);
 
       const batches = db
         .prepare(

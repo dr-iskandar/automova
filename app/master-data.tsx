@@ -3002,35 +3002,83 @@ export function DynamicDashboard({
     1,
     ...(data?.daily.map((item) => item.output) || []),
   );
+
+  const periodLabel = from === to ? `Hari Ini (${from})` : `${from} s/d ${to}`;
+
   const metrics = [
     {
       label: "Total Output",
       value: `${Number(data?.summary.total_output || 0).toLocaleString("id-ID")} L`,
+      subtext: `${data?.summary.completed || 0} batch selesai · Periode ${periodLabel}`,
       icon: "bi-graph-up-arrow",
       tone: "blue",
     },
     {
       label: "Total Batch",
-      value: String(data?.summary.total_batches || 0),
+      value: `${data?.summary.total_batches || 0} Batch`,
+      subtext: `${data?.summary.completed || 0} Selesai (${data?.summary.paused || 0} Paused, ${data?.summary.cancelled || 0} Batal) · Periode ${periodLabel}`,
       icon: "bi-box-seam",
       tone: "green",
     },
     {
       label: "Completion Rate",
       value: `${data?.summary.completion_rate || 0}%`,
+      subtext: `${data?.summary.completed || 0} dari ${data?.summary.total_batches || 0} batch berhasil · Periode ${periodLabel}`,
       icon: "bi-check2-circle",
       tone: "purple",
     },
     {
       label: "Perlu Perhatian",
-      value: String(
-        Number(data?.summary.paused || 0) +
-          Number(data?.summary.cancelled || 0),
-      ),
+      value: `${Number(data?.summary.paused || 0) + Number(data?.summary.cancelled || 0)} Batch`,
+      subtext: `${data?.summary.paused || 0} Paused & ${data?.summary.cancelled || 0} Batal · Periode ${periodLabel}`,
       icon: "bi-exclamation-triangle",
       tone: "orange",
     },
   ];
+
+  const aggregatedMachines = useMemo(() => {
+    if (!data?.machines) return [];
+    const map = new Map<string, { machine: string; total_batches: number; completed: number; output: number; total_duration: number; duration_count: number }>();
+    for (const item of data.machines) {
+      const name = formatMachineName(item.machine, masterLines) || item.machine || "N/A";
+      if (!map.has(name)) {
+        map.set(name, { machine: name, total_batches: 0, completed: 0, output: 0, total_duration: 0, duration_count: 0 });
+      }
+      const curr = map.get(name)!;
+      curr.total_batches += Number(item.total_batches || 0);
+      curr.completed += Number(item.completed || 0);
+      curr.output += Number(item.output || 0);
+      if (item.avg_duration) {
+        curr.total_duration += Number(item.avg_duration);
+        curr.duration_count += 1;
+      }
+    }
+    return Array.from(map.values())
+      .map((m) => ({
+        machine: m.machine,
+        total_batches: m.total_batches,
+        completed: m.completed,
+        output: m.output,
+        avg_duration: m.duration_count > 0 ? Math.round(m.total_duration / m.duration_count) : 0,
+      }))
+      .sort((a, b) => b.total_batches - a.total_batches);
+  }, [data?.machines, masterLines]);
+
+  const aggregatedByMachine = useMemo(() => {
+    if (!drilldownData?.by_machine) return [];
+    const map = new Map<string, { machine: string; count: number; output: number }>();
+    for (const item of drilldownData.by_machine) {
+      const name = formatMachineName(item.machine, masterLines) || item.machine || "N/A";
+      if (!map.has(name)) {
+        map.set(name, { machine: name, count: 0, output: 0 });
+      }
+      const curr = map.get(name)!;
+      curr.count += Number(item.count || 0);
+      curr.output += Number(item.output || 0);
+    }
+    return Array.from(map.values()).sort((a, b) => b.output - a.output);
+  }, [drilldownData?.by_machine, masterLines]);
+
   return (
     <div className="admin-page">
       <MasterHeader
@@ -3060,10 +3108,12 @@ export function DynamicDashboard({
             <div>
               <small>{metric.label}</small>
               <strong>{metric.value}</strong>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px", marginTop: "4px" }}>
-                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                  {from} s/d {to}
+              <div style={{ marginTop: "4px" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)", display: "block", lineHeight: "1.3" }}>
+                  {metric.subtext}
                 </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px", marginTop: "8px" }}>
                 {metric.label === "Total Output" && (
                   <button
                     type="button"
@@ -3252,8 +3302,8 @@ export function DynamicDashboard({
                 </tr>
               </thead>
               <tbody>
-                {data?.machines && data.machines.length > 0 ? (
-                  data.machines.map((mach, idx) => (
+                {aggregatedMachines.length > 0 ? (
+                  aggregatedMachines.map((mach, idx) => (
                     <tr key={idx}>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -3379,11 +3429,11 @@ export function DynamicDashboard({
                   <h3 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 1rem 0", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
                     <i className="bi bi-cpu" style={{ color: "#10b981" }} /> Breakdown Output per Mesin / Line
                   </h3>
-                  {drilldownData.by_machine.length > 0 ? (
+                  {aggregatedByMachine.length > 0 ? (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
-                      {drilldownData.by_machine.map((m, i) => (
+                      {aggregatedByMachine.map((m, i) => (
                         <div key={i} style={{ background: "#fff", border: "1px solid #cbd5e1", padding: "12px 14px", borderRadius: "10px", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-                          <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, display: "block" }}>{formatMachineName(m.machine, masterLines)}</span>
+                          <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600, display: "block" }}>{m.machine}</span>
                           <strong style={{ fontSize: "18px", color: "#0f172a", display: "block", marginTop: "2px" }}>
                             {Number(m.output).toLocaleString("id-ID")} L
                           </strong>
