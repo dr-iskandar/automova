@@ -4251,7 +4251,7 @@ function AdminContent(props: {
   if (view === "reports") return <ReportManager notify={setToast} role={props.role} authUser={props.authUser} />;
   if (view === "settings") return <SystemSettingsMaster notify={setToast} />;
   return (
-    <DynamicDashboard role={props.role} notify={setToast} onNavigate={() => setView("history")} />
+    <DynamicDashboard role={props.role} notify={setToast} onNavigate={(target) => setView(target as View)} />
   );
 }
 

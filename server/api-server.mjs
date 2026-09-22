@@ -1577,6 +1577,7 @@ const server = createServer(async (req, res) => {
           SUM(CASE WHEN status='Completed' THEN 1 ELSE 0 END) AS completed,
           SUM(CASE WHEN status='Paused' THEN 1 ELSE 0 END) AS paused,
           SUM(CASE WHEN status='Cancelled' THEN 1 ELSE 0 END) AS cancelled,
+          COALESCE(SUM(CASE WHEN status='Completed' THEN COALESCE(actual_material_cost, estimated_material_cost, 0) ELSE 0 END),0) AS total_cost,
           COALESCE(ROUND(AVG(CASE WHEN status='Completed' THEN actual_duration END)),0) AS avg_duration
           FROM batches WHERE ${condition}`,
         )
@@ -1599,6 +1600,18 @@ const server = createServer(async (req, res) => {
           `SELECT * FROM batches WHERE ${condition} AND status IN ('Paused','Cancelled') ORDER BY started_at DESC LIMIT 5`,
         )
         .all(...values);
+      const criticalMaterials = db
+        .prepare(
+          `SELECT id, code, name, initial_stock AS stock, min_sku, unit, 'Material' AS category FROM materials WHERE status='Active' AND min_sku > 0 AND initial_stock <= min_sku`,
+        )
+        .all();
+      const criticalPackagings = db
+        .prepare(
+          `SELECT id, code, name, initial_stock AS stock, min_sku, unit, 'Kemasan' AS category FROM master_packaging WHERE status='Active' AND min_sku > 0 AND initial_stock <= min_sku`,
+        )
+        .all();
+      const criticalItems = [...criticalMaterials, ...criticalPackagings];
+
       const materials = db
         .prepare(
           `SELECT jm.name,jm.unit,ROUND(SUM(jm.qty),2) AS qty
@@ -1666,6 +1679,7 @@ const server = createServer(async (req, res) => {
           daily,
           recent,
           issues,
+          critical_items: criticalItems,
           materials,
           machines,
         },

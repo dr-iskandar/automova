@@ -2896,10 +2896,20 @@ type DashboardData = {
     cancelled: number;
     avg_duration: number;
     completion_rate: number;
+    total_cost?: number;
   };
   daily: Array<{ day: string; output: number; batches: number }>;
   recent: BatchRow[];
   issues: BatchRow[];
+  critical_items?: Array<{
+    id: string;
+    code: string;
+    name: string;
+    stock: number;
+    min_sku: number;
+    unit: string;
+    category: "Material" | "Kemasan";
+  }>;
   materials: Array<{ name: string; unit: string; qty: number }>;
   machines: Array<{
     machine: string;
@@ -2946,13 +2956,14 @@ export function DynamicDashboard({
 }: {
   role: string;
   notify: (message: string) => void;
-  onNavigate: (view: "history") => void;
+  onNavigate: (view: string) => void;
 }) {
   const [from, setFrom] = useState(() => offsetDate(-7));
   const [to, setTo] = useState(() => offsetDate(0));
   const [data, setData] = useState<DashboardData | null>(null);
 
   const [outputDetailModalOpen, setOutputDetailModalOpen] = useState(false);
+  const [attentionModalOpen, setAttentionModalOpen] = useState(false);
   const [selectedDrilldownDate, setSelectedDrilldownDate] = useState<string | null>(null);
   const [drilldownData, setDrilldownData] = useState<OutputDrilldownData | null>(null);
   const [loadingDrilldown, setLoadingDrilldown] = useState(false);
@@ -3021,16 +3032,18 @@ export function DynamicDashboard({
       tone: "green",
     },
     {
-      label: "Completion Rate",
-      value: `${data?.summary.completion_rate || 0}%`,
-      subtext: `${data?.summary.completed || 0} dari ${data?.summary.total_batches || 0} batch berhasil · Periode ${periodLabel}`,
-      icon: "bi-check2-circle",
+      label: "Laporan & Biaya",
+      value: data?.summary.total_cost !== undefined && data.summary.total_cost > 0
+        ? formatRupiah(data.summary.total_cost)
+        : "Buka Laporan",
+      subtext: `Analisis biaya & laporan produksi · Periode ${periodLabel}`,
+      icon: "bi-file-earmark-bar-graph",
       tone: "purple",
     },
     {
       label: "Perlu Perhatian",
-      value: `${Number(data?.summary.paused || 0) + Number(data?.summary.cancelled || 0)} Batch`,
-      subtext: `${data?.summary.paused || 0} Paused & ${data?.summary.cancelled || 0} Batal · Periode ${periodLabel}`,
+      value: `${(data?.issues?.length || 0) + (data?.critical_items?.length || 0)} Isu`,
+      subtext: `${data?.issues?.length || 0} Kendala Batch · ${data?.critical_items?.length || 0} Stok Kritis`,
       icon: "bi-exclamation-triangle",
       tone: "orange",
     },
@@ -3134,14 +3147,14 @@ export function DynamicDashboard({
                     <i className="bi bi-clock-history" /> Lihat Batch
                   </button>
                 )}
-                {metric.label === "Completion Rate" && (
+                {metric.label === "Laporan & Biaya" && (
                   <button
                     type="button"
                     className="btn btn-sm btn-outline-info"
                     style={{ padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px" }}
-                    onClick={() => openOutputDrilldown()}
+                    onClick={() => onNavigate("reports")}
                   >
-                    <i className="bi bi-pie-chart" /> Detail Rate
+                    <i className="bi bi-file-earmark-text" /> Buka Laporan
                   </button>
                 )}
                 {metric.label === "Perlu Perhatian" && (
@@ -3149,9 +3162,9 @@ export function DynamicDashboard({
                     type="button"
                     className="btn btn-sm btn-outline-warning"
                     style={{ padding: "2px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "4px" }}
-                    onClick={() => onNavigate("history")}
+                    onClick={() => setAttentionModalOpen(true)}
                   >
-                    <i className="bi bi-exclamation-octagon" /> Periksa Batch
+                    <i className="bi bi-exclamation-octagon" /> Periksa Isu
                   </button>
                 )}
               </div>
@@ -3234,28 +3247,51 @@ export function DynamicDashboard({
         <section className="panel issue-card">
           <div className="panel-head">
             <div>
-              <h2>Kendala Produksi</h2>
-              <p>Paused dan cancelled pada periode terpilih</p>
+              <h2>Perlu Perhatian</h2>
+              <p>Kendala produksi batch & stok material/kemasan kritis</p>
             </div>
+            <button type="button" className="btn btn-sm btn-link" onClick={() => setAttentionModalOpen(true)}>
+              Detail ({ (data?.issues?.length || 0) + (data?.critical_items?.length || 0) })
+            </button>
           </div>
           <div className="issue-list">
-            {data?.issues.length ? (
-              data.issues.map((item) => (
-                <div key={item.id}>
-                  <span className="issue-icon orange">
-                    <i className="bi bi-exclamation-triangle" />
-                  </span>
-                  <p>
-                    <strong>{item.job_name}</strong>
-                    <small>
-                      {item.operator_name} · {item.id}
-                    </small>
-                  </p>
-                  <SimpleBadge value={item.status} />
-                </div>
-              ))
+            {Boolean(data?.issues?.length || data?.critical_items?.length) ? (
+              <>
+                {data?.issues?.map((item) => (
+                  <div key={item.id} style={{ cursor: "pointer" }} onClick={() => onNavigate("history")}>
+                    <span className="issue-icon orange">
+                      <i className="bi bi-exclamation-triangle" />
+                    </span>
+                    <p>
+                      <strong>[Batch Kendala] {item.job_name}</strong>
+                      <small>
+                        {item.operator_name} · {item.id}
+                      </small>
+                    </p>
+                    <SimpleBadge value={item.status} />
+                  </div>
+                ))}
+                {data?.critical_items?.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => onNavigate(item.category === "Material" ? "material-ledger" : "packaging-ledger")}
+                  >
+                    <span className="issue-icon red" style={{ backgroundColor: "#fef2f2", color: "#dc2626" }}>
+                      <i className="bi bi-box-seam-fill" />
+                    </span>
+                    <p>
+                      <strong>[{item.category} Kritis] {item.name} ({item.code})</strong>
+                      <small>
+                        Stok Saat Ini: <strong style={{ color: "#dc2626" }}>{item.stock} {item.unit}</strong> (Min SKU: {item.min_sku})
+                      </small>
+                    </p>
+                    <span className="badge bg-danger">Stok Min Kritis</span>
+                  </div>
+                ))}
+              </>
             ) : (
-              <p className="empty-state">Tidak ada kendala.</p>
+              <p className="empty-state">Tidak ada isu atau stok kritis.</p>
             )}
           </div>
         </section>
@@ -3341,6 +3377,133 @@ export function DynamicDashboard({
           </div>
         </section>
       </div>
+
+      {/* ATTENTION / PERLU PERHATIAN DETAIL MODAL */}
+      {attentionModalOpen && (
+        <div className="modal-backdrop-custom" style={{ zIndex: 1100 }}>
+          <div className="override-modal" style={{ maxWidth: "800px", width: "95%", maxHeight: "90vh", overflowY: "auto" }}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setAttentionModalOpen(false)}
+              aria-label="Tutup"
+            >
+              <i className="bi bi-x-lg" />
+            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "1rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "1rem" }}>
+              <span style={{ width: "42px", height: "42px", borderRadius: "12px", background: "linear-gradient(135deg, #f97316, #ea580c)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", boxShadow: "0 4px 12px rgba(249, 115, 22, 0.2)" }}>
+                <i className="bi bi-exclamation-triangle-fill" />
+              </span>
+              <div>
+                <p className="section-kicker" style={{ margin: 0, color: "#ea580c" }}>DAFTAR PERLU PERHATIAN</p>
+                <h2 style={{ margin: 0, fontSize: "20px" }}>Rincian Kendala & Stok Kritis</h2>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {/* Batch Issues Section */}
+              <div>
+                <h3 style={{ fontSize: "14px", fontWeight: 700, color: "#334155", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <i className="bi bi-pause-circle-fill text-warning" /> Kendala Batch Produksi ({data?.issues?.length || 0})
+                </h3>
+                {data?.issues?.length ? (
+                  <div className="table-responsive">
+                    <table className="table table-sm table-hover border" style={{ fontSize: "12px" }}>
+                      <thead style={{ background: "#f8fafc" }}>
+                        <tr>
+                          <th>ID / Batch</th>
+                          <th>Produk / Job</th>
+                          <th>Operator</th>
+                          <th>Status</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.issues.map((b) => (
+                          <tr key={b.id}>
+                            <td style={{ fontFamily: "monospace", fontWeight: 700 }}>{b.id}</td>
+                            <td>{b.job_name}</td>
+                            <td>{b.operator_name}</td>
+                            <td><SimpleBadge value={b.status} /></td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-outline-primary"
+                                onClick={() => {
+                                  setAttentionModalOpen(false);
+                                  onNavigate("history");
+                                }}
+                              >
+                                Buka Batch
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-muted" style={{ fontSize: "12px" }}>Tidak ada batch yang membutuhkan perhatian saat ini.</p>
+                )}
+              </div>
+
+              {/* Critical Stock Items Section */}
+              <div>
+                <h3 style={{ fontSize: "14px", fontWeight: 700, color: "#334155", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <i className="bi bi-box-seam-fill text-danger" /> Stok Material & Kemasan Kritis ({data?.critical_items?.length || 0})
+                </h3>
+                {data?.critical_items?.length ? (
+                  <div className="table-responsive">
+                    <table className="table table-sm table-hover border" style={{ fontSize: "12px" }}>
+                      <thead style={{ background: "#f8fafc" }}>
+                        <tr>
+                          <th>Kategori</th>
+                          <th>Kode SKU</th>
+                          <th>Nama Barang</th>
+                          <th>Stok Saat Ini</th>
+                          <th>Min SKU</th>
+                          <th>Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.critical_items.map((item) => (
+                          <tr key={item.id}>
+                            <td>
+                              <span className={`badge ${item.category === "Material" ? "bg-info text-dark" : "bg-purple text-white"}`} style={{ backgroundColor: item.category === "Kemasan" ? "#8b5cf6" : undefined }}>
+                                {item.category}
+                              </span>
+                            </td>
+                            <td style={{ fontFamily: "monospace", fontWeight: 700 }}>{item.code}</td>
+                            <td>{item.name}</td>
+                            <td style={{ color: "#dc2626", fontWeight: 700 }}>
+                              {item.stock} {item.unit}
+                            </td>
+                            <td>{item.min_sku} {item.unit}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-outline-danger"
+                                onClick={() => {
+                                  setAttentionModalOpen(false);
+                                  onNavigate(item.category === "Material" ? "material-ledger" : "packaging-ledger");
+                                }}
+                              >
+                                Lihat Ledger
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-muted" style={{ fontSize: "12px" }}>Seluruh stok bahan dan kemasan berada di atas batas minimum.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* OUTPUT DRILLDOWN ANALYTICS MODAL */}
       {outputDetailModalOpen && (
