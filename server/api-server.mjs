@@ -1602,12 +1602,26 @@ const server = createServer(async (req, res) => {
         .all(...values);
       const criticalMaterials = db
         .prepare(
-          `SELECT id, code, name, initial_stock AS stock, min_sku, unit, 'Material' AS category FROM materials WHERE status='Active' AND min_sku > 0 AND initial_stock <= min_sku`,
+          `SELECT m.id, m.code, m.name, 
+          COALESCE(SUM(CASE WHEN mm.movement_type IN ('IN','ADJUSTMENT_IN') THEN mm.qty WHEN mm.movement_type IN ('OUT','ADJUSTMENT_OUT') THEN -mm.qty ELSE 0 END),0) AS stock, 
+          m.min_sku, m.unit, 'Material' AS category 
+          FROM materials m 
+          LEFT JOIN material_movements mm ON mm.material_id=m.id 
+          WHERE m.status='Active' AND m.min_sku > 0 
+          GROUP BY m.id 
+          HAVING stock <= m.min_sku`,
         )
         .all();
       const criticalPackagings = db
         .prepare(
-          `SELECT id, code, name, initial_stock AS stock, min_sku, unit, 'Kemasan' AS category FROM master_packaging WHERE status='Active' AND min_sku > 0 AND initial_stock <= min_sku`,
+          `SELECT m.id, m.code, m.name, 
+          COALESCE(SUM(CASE WHEN mm.movement_type IN ('IN','ADJUSTMENT_IN') THEN mm.qty WHEN mm.movement_type IN ('OUT','ADJUSTMENT_OUT') THEN -mm.qty ELSE 0 END),0) AS stock, 
+          m.min_sku, m.unit, 'Kemasan' AS category 
+          FROM master_packaging m 
+          LEFT JOIN packaging_movements mm ON mm.packaging_id=m.id 
+          WHERE m.status='Active' AND m.min_sku > 0 
+          GROUP BY m.id 
+          HAVING stock <= m.min_sku`,
         )
         .all();
       const criticalItems = [...criticalMaterials, ...criticalPackagings];
