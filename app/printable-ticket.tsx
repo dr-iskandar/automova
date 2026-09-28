@@ -49,7 +49,8 @@ export function PrintableTicket({
 
   const rawMachine = batch.machine || batch.line || "";
   const machineInfo = formatMachineName(rawMachine, masterLines);
-  const qrText = `Kode Drum: ${batch.product_code || "N/A"}\nBatch no: ${batch.batch_no}\nMesin: ${machineInfo || "-"}\nEstimasi Hasil: ${batch.output_qty} ${batch.unit}\nLokasi: ${batch.storage_location || "-"}\nFilling: ${batch.filling_date || "-"}\nExpired: ${batch.expired_date || "-"}\nCatatan: ${batch.special_notes || "-"}`;
+  const displayMachine = machineInfo && machineInfo !== "LINE N/A" && machineInfo !== "N/A" ? machineInfo : "";
+  const qrText = `Kode Drum: ${batch.product_code || "-"}\nBatch no: ${batch.batch_no}\nMesin: ${displayMachine || "-"}\nEstimasi Hasil: ${batch.output_qty} ${batch.unit}\nLokasi: ${batch.storage_location || "-"}\nFilling: ${batch.filling_date || "-"}\nExpired: ${batch.expired_date || "-"}\nCatatan: ${batch.special_notes || "-"}`;
 
   return createPortal(
     <div className="printable-ticket" aria-hidden="true">
@@ -57,11 +58,11 @@ export function PrintableTicket({
         <div className="ticket-title-group">
           <h1>AUTOMOVA</h1>
           <h2>PRODUCTION ROUTING TICKET</h2>
-          {machineInfo && (
+          {displayMachine ? (
             <div className="ticket-machine-box" style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", marginTop: "3px", letterSpacing: "0.5px" }}>
-              MESIN: {machineInfo}
+              MESIN: {displayMachine}
             </div>
-          )}
+          ) : null}
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
           <QRCodeSVG
@@ -78,14 +79,14 @@ export function PrintableTicket({
         </div>
       </header>
 
-      <div className="ticket-section">
-        <div className="ticket-row" style={{ marginBottom: '4px' }}>
-          <span className="ticket-label">Kode Drum:</span>
-          <strong className="ticket-value uppercase" style={{ fontSize: '1.2rem' }}>{batch.product_code || "N/A"}</strong>
+      <div className="ticket-section" style={{ paddingBottom: '6px', marginBottom: '6px' }}>
+        <div className="ticket-row" style={{ marginBottom: '8px', display: 'block' }}>
+          <span className="ticket-label" style={{ display: 'block', fontSize: '9px', marginBottom: '2px' }}>Kode Drum:</span>
+          <strong className="ticket-value uppercase" style={{ display: 'block', fontSize: '14px', lineHeight: '1.2', fontWeight: 'bold' }}>{batch.product_code || "-"}</strong>
         </div>
-        <div className="ticket-row">
-          <span className="ticket-label">Batch ID:</span>
-          <strong className="ticket-value uppercase">{batch.batch_no}</strong>
+        <div className="ticket-row" style={{ marginBottom: '6px', display: 'block' }}>
+          <span className="ticket-label" style={{ display: 'block', fontSize: '9px', marginBottom: '2px' }}>Batch ID:</span>
+          <strong className="ticket-value uppercase" style={{ display: 'block', fontSize: '12px', lineHeight: '1.2', fontWeight: 'bold' }}>{batch.batch_no}</strong>
         </div>
         <div className="ticket-row">
           <span className="ticket-label">Job Name:</span>
