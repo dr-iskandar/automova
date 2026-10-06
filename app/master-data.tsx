@@ -3032,15 +3032,20 @@ export function DynamicDashboard({
       icon: "bi-box-seam",
       tone: "green",
     },
-    {
-      label: "Laporan & Biaya",
-      value: data?.summary.total_cost !== undefined && data.summary.total_cost > 0
-        ? formatRupiah(data.summary.total_cost)
-        : "Buka Laporan",
-      subtext: `Analisis biaya & laporan produksi · Periode ${periodLabel}`,
-      icon: "bi-file-earmark-bar-graph",
-      tone: "purple",
-    },
+    ...(role === "admin"
+      ? [
+          {
+            label: "Laporan & Biaya",
+            value:
+              data?.summary.total_cost !== undefined && data.summary.total_cost > 0
+                ? formatRupiah(data.summary.total_cost)
+                : "Buka Laporan",
+            subtext: `Analisis biaya & laporan produksi · Periode ${periodLabel}`,
+            icon: "bi-file-earmark-bar-graph",
+            tone: "purple",
+          },
+        ]
+      : []),
     {
       label: "Perlu Perhatian",
       value: `${(data?.issues?.length || 0) + (data?.critical_items?.length || 0)} Isu`,

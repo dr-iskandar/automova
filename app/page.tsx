@@ -70,7 +70,6 @@ const hasViewPermission = (view: View, authUser: AuthUser | null, role: Role): b
       "packaging-ledger",
       "performance",
       "history",
-      "reports",
       "account",
     ].includes(view);
   }
@@ -102,7 +101,7 @@ const hasViewPermission = (view: View, authUser: AuthUser | null, role: Role): b
       return userPermissions.includes("dashboard.view") || 
              userPermissions.includes("batches.view_all");
     case "reports":
-      return userPermissions.includes("reports.view");
+      return role === "admin";
     case "users":
       return userPermissions.includes("users.manage");
     case "access":
@@ -4248,7 +4247,14 @@ function AdminContent(props: {
   if (view === "performance") return <OperatorPerformance notify={setToast} />;
   if (view === "history")
     return <DatabaseBatchHistory notify={setToast} role={props.role} authUser={props.authUser} />;
-  if (view === "reports") return <ReportManager notify={setToast} role={props.role} authUser={props.authUser} />;
+  if (view === "reports") {
+    if (props.role !== "admin") {
+      return (
+        <DynamicDashboard role={props.role} notify={setToast} onNavigate={(target) => setView(target as View)} />
+      );
+    }
+    return <ReportManager notify={setToast} role={props.role} authUser={props.authUser} />;
+  }
   if (view === "settings") return <SystemSettingsMaster notify={setToast} />;
   return (
     <DynamicDashboard role={props.role} notify={setToast} onNavigate={(target) => setView(target as View)} />

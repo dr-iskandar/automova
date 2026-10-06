@@ -324,16 +324,12 @@ function seed() {
       "batches.execute",
       "batches.override",
       "batches.view_all",
-      "reports.view",
-      "reports.export",
       "audit.view",
     ],
     "role-operator": ["batches.execute"],
     "role-viewer": [
       "dashboard.view",
       "batches.view_all",
-      "reports.view",
-      "reports.export",
     ],
   };
   const insertRolePermission = db.prepare(
@@ -342,6 +338,11 @@ function seed() {
   for (const [roleId, ids] of Object.entries(rolePermissionMap))
     for (const permissionId of ids)
       insertRolePermission.run(roleId, permissionId);
+
+  // Ensure non-admin roles do not retain reports.view or reports.export permissions
+  db.prepare(
+    "DELETE FROM role_permissions WHERE role_id != 'role-admin' AND permission_id IN ('reports.view','reports.export')",
+  ).run();
 
   if (db.prepare("SELECT COUNT(*) AS count FROM users").get().count === 0) {
     const insertUser = db.prepare(
