@@ -38,7 +38,7 @@ if (fs.existsSync(prodServerFile)) {
 
   const handleStartStr = `const handleRequest = async (req, res) => {\n\t\tconst rawUrl = req.url ?? "/";\n\t\tconst rawPathname = rawUrl.split("?")[0];`;
   
-  const proxyCodeStr = `const handleRequest = async (req, res) => {\n\t\tconst rawUrl = req.url ?? "/";\n\t\tconst rawPathname = rawUrl.split("?")[0];\n\t\tif (rawPathname.startsWith("/api/") || rawPathname === "/api") {\n\t\t\tconst pReq = httpRequest({\n\t\t\t\thostname: "127.0.0.1",\n\t\t\t\tport: 3100,\n\t\t\t\tpath: rawUrl,\n\t\t\t\tmethod: req.method,\n\t\t\t\theaders: { ...req.headers, host: "127.0.0.1:3100" }\n\t\t\t}, (pRes) => {\n\t\t\t\tres.writeHead(pRes.statusCode, pRes.headers);\n\t\t\t\tpRes.pipe(res, { end: true });\n\t\t\t});\n\t\t\tpReq.on("error", (err) => {\n\t\t\t\tconsole.error("[vinext api proxy error]", err);\n\t\t\t\tif (!res.headersSent) {\n\t\t\t\t\tres.writeHead(502);\n\t\t\t\t\tres.end("Bad Gateway: API server (port 3100) not responding");\n\t\t\t\t}\n\t\t\t});\n\t\t\treq.pipe(pReq, { end: true });\n\t\t\treturn;\n\t\t}`;
+  const proxyCodeStr = `const handleRequest = async (req, res) => {\n\t\tconst rawUrl = req.url ?? "/";\n\t\tconst rawPathname = rawUrl.split("?")[0];\n\t\tif (rawPathname.startsWith("/api/") || rawPathname === "/api") {\n\t\t\tconst pReq = httpRequest({\n\t\t\t\thostname: "127.0.0.1",\n\t\t\t\tport: 3100,\n\t\t\t\tpath: rawUrl,\n\t\t\t\tmethod: req.method,\n\t\t\t\theaders: { ...req.headers, host: "127.0.0.1:3100" }\n\t\t\t}, (pRes) => {\n\t\t\t\tres.writeHead(pRes.statusCode, pRes.headers);\n\t\t\t\tpRes.pipe(res, { end: true });\n\t\t\t});\n\t\t\tpReq.setTimeout(10000, () => { pReq.destroy(); });\n\t\t\tpReq.on("error", (err) => {\n\t\t\t\tconsole.error("[vinext api proxy error]", err);\n\t\t\t\tif (!res.headersSent) {\n\t\t\t\t\tres.writeHead(502);\n\t\t\t\t\tres.end("Bad Gateway: API server (port 3100) not responding");\n\t\t\t\t}\n\t\t\t});\n\t\t\treq.pipe(pReq, { end: true });\n\t\t\treturn;\n\t\t}`;
 
   if (content.includes(handleStartStr) && !content.includes("vinext api proxy error")) {
     content = content.replace(handleStartStr, proxyCodeStr);
@@ -48,6 +48,17 @@ if (fs.existsSync(prodServerFile)) {
     console.log("[patch-vinext] vinext prod-server.js is already patched for /api proxy.");
   } else {
     console.warn("[patch-vinext] Could not find target pattern in vinext prod-server.js");
+  }
+  // 3. Silence harmless 'Premature close' warnings when clients disconnect mid-download
+  const streamWarnStr1 = `console.warn(\`[vinext] Static file stream error for \${resolved.path}:\`, err.message);`;
+  const streamWarnFix1 = `if (err && err.message !== "Premature close" && err.code !== "ERR_STREAM_PREMATURE_CLOSE") console.warn(\`[vinext] Static file stream error for \${resolved.path}:\`, err.message);`;
+  const streamWarnStr2 = `console.warn(\`[vinext] Static file stream error for \${variant.path}:\`, err.message);`;
+  const streamWarnFix2 = `if (err && err.message !== "Premature close" && err.code !== "ERR_STREAM_PREMATURE_CLOSE") console.warn(\`[vinext] Static file stream error for \${variant.path}:\`, err.message);`;
+
+  if (content.includes(streamWarnStr1) || content.includes(streamWarnStr2)) {
+    content = content.replaceAll(streamWarnStr1, streamWarnFix1).replaceAll(streamWarnStr2, streamWarnFix2);
+    fs.writeFileSync(prodServerFile, content, "utf-8");
+    console.log("[patch-vinext] Patched static stream error warnings for Premature close.");
   }
 } else {
   console.warn("[patch-vinext] prod-server.js not found at expected path.");

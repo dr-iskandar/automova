@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, copyFileSync, statSync, readdirSync, unlinkSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomUUID, scryptSync, randomBytes } from "node:crypto";
+import os from "node:os";
 
 const databasePath = resolve(
   process.env.AUTOMOVA_DB_PATH || "data/automova.sqlite",
@@ -669,7 +670,6 @@ const server = createServer(async (req, res) => {
   const path = url.pathname;
   try {
     if (path === "/api/health" && req.method === "GET") {
-      const os = await import("node:os");
       const interfaces = os.networkInterfaces();
       const ips = [];
       for (const name of Object.keys(interfaces)) {

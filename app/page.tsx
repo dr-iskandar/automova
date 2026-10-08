@@ -921,28 +921,47 @@ export default function Home({
     void loadDatabase();
   }, []);
 
+  const healthFailCountRef = useRef(0);
+  const isHealthCheckingRef = useRef(false);
+
   const checkHealth = useCallback(async () => {
+    if (isHealthCheckingRef.current) return;
+    isHealthCheckingRef.current = true;
     const startTime = performance.now();
     const timeStr = new Date().toLocaleTimeString("id-ID");
+
     try {
-      await apiFetch<{ ok: boolean }>("/health");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      await apiFetch<{ ok: boolean }>("/health", { signal: controller.signal });
+      clearTimeout(timeoutId);
+
       const rtt = Math.round(performance.now() - startTime);
+      healthFailCountRef.current = 0;
       setServerLatency(rtt);
       setLastHealthCheck(timeStr);
       setDatabaseOnline(true);
     } catch (err: any) {
-      const errMsg = err?.message || "Koneksi terputus";
-      setServerLatency(null);
-      setLastHealthCheck(timeStr);
-      setDatabaseOnline((prev) => {
-        if (prev) {
-          setNetLogs((logs) => [
-            { time: timeStr, status: "error", message: `TERPUTUS: ${errMsg}` },
-            ...logs.slice(0, 49),
-          ]);
-        }
-        return false;
-      });
+      healthFailCountRef.current += 1;
+      const errMsg = err?.name === "AbortError" ? "Timeout koneksi (4s)" : (err?.message || "Koneksi terputus");
+
+      // Set offline ONLY after 2 consecutive failed health checks to absorb transient Wi-Fi drops on factory tablets
+      if (healthFailCountRef.current >= 2) {
+        setServerLatency(null);
+        setLastHealthCheck(timeStr);
+        setDatabaseOnline((prev) => {
+          if (prev) {
+            setNetLogs((logs) => [
+              { time: timeStr, status: "error", message: `TERPUTUS (${healthFailCountRef.current}x): ${errMsg}` },
+              ...logs.slice(0, 49),
+            ]);
+          }
+          return false;
+        });
+      }
+    } finally {
+      isHealthCheckingRef.current = false;
     }
   }, []);
 
